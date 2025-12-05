@@ -1,0 +1,141 @@
+﻿@model UtilityViewModel
+@{
+    ViewData["Title"] = "Index";
+    var dbTypes = Model.DatabaseInfo.GroupBy(db => db.DbType).ToList();
+    var availableEnvironment = Model.DatabaseInfo.GroupBy(db => db.Environment).ToList();
+}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title"> Data Comparison Utility </h5>
+                <p class="card-text"> Use this utility to compare data between two sources and identify discrepancies. </p>
+                <form asp-action="Index" method="get">
+                    <input type="text" name="searchString" value="@Model.SearchString" placeholder="Enter search term" class="form-control mb-2" />
+                    <button type="submit" class="btn btn-primary mb-2">Search</button>
+                </form>
+                @if (Model.ConnectionInformation.Any())
+                {
+                    <h4>Showing Result For: @Model.SearchString</h4>
+                    <table class="table table-bordered">
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th>Id</th>
+                                <th>CompanyName</th>
+                                <th>Db Server</th>
+                                <th>Database</th>
+                                <th>Db Type</th>
+                            </tr>
+                        </thead>
+                        @foreach (var item in Model.ConnectionInformation)
+                        {
+                            <tbody>
+                                <tr>
+                                    <td><input type="checkbox" data-id="@item.ParentCompanyId" data-dbType="@item.DatabaseCType" data-companyName="@item.CompanyName" /></td>
+                                    <td>@item.ParentCompanyId</td>
+                                    <td>@item.CompanyName</td>
+                                    <td>@item.ServerName</td>
+                                    <td>@item.DatabaseName</td>
+                                    <td>@item.DatabaseCType</td>
+                                </tr>
+                            </tbody>
+                        }
+                    </table>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h4>Field Level Comparison</h4>
+                            <form method="get" asp-controller="Utility" asp-action="CompareData">
+                                <input type="hidden" name="featureSet" value="1" />
+                                <input type="hidden" name="searchString" value="@Model.SearchString" />
+                                <button type="submit" class="btn btn-success">Compare eIn&lt;&gt;CenRes&lt;&gt;Mongo&lt;&gt;Normalize</button>
+                            </form>
+                            <form method="get" asp-controller="Utility" asp-action="CompareData">
+                                <input type="hidden" name="featureSet" value="2" />
+                                <input type="hidden" name="searchString" value="@Model.SearchString" />
+                                <button type="submit" class="btn btn-success">Compare  CenRes&lt;&gt;Mongo&lt;&gt;Normalize</button>
+                            </form>
+                        </div>
+                        <div class="col-md-6">
+
+                            <h4>Volume Based Comparison</h4>
+                            <ul>
+                                <li> Number of profiles</li>
+                                <li> Number of reservations</li>
+                                <li> Number of nightly rate rows</li>
+                                <li> Number of transactions</li>
+                            </ul>
+                            <form asp-action="VolumeBasedResult" asp-controller="Utility" method="post">
+                                <input type="hidden" name="feature" asp-for="@Model.RecordSelectionModel.Feature" value="1" />
+                                <h4>Select Time Frame</h4>
+                                <div>
+                                    <label>
+                                        <input type="radio" asp-for="@Model.RecordSelectionModel.TimeFrame" name="TimeFrame" value="Last3Years" style="cursor:pointer;" /> Last 3 years of data
+                                    </label>
+                                </div>
+                                <div>
+                                    <label>
+                                        <input type="radio" asp-for="@Model.RecordSelectionModel.TimeFrame" name="TimeFrame" value="AllData" style="cursor:pointer;" /> All data
+                                    </label>
+                                </div>
+                                <button type="submit" class="btn btn-success">Submit</button>
+                            </form>
+                        </div>
+                    </div>
+
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Configured Databases</h5>
+                <p class="card-text"> Manage and view database connections. </p>
+                <div class="accordion" id="accordionExample">
+                    @{
+                        int accIndex = 0;
+                    }
+                    @foreach (var dbTypeGroup in dbTypes)
+                    {
+                        var collapseId = $"collapse{accIndex}";
+                        var headingId = $"heading{accIndex}";
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="@headingId">
+                                <button class="accordion-button @(accIndex == 0 ? "" : "collapsed")" type="button" data-bs-toggle="collapse" data-bs-target="#@collapseId" aria-expanded="@(accIndex == 0 ? "true" : "false")" aria-controls="@collapseId">
+                                    @dbTypeGroup.Key
+                                </button>
+                            </h2>
+                            <div id="@collapseId" class="accordion-collapse collapse @(accIndex == 0 ? "show" : "")" aria-labelledby="@headingId" data-bs-parent="#accordionExample">
+                                <div class="accordion-body">
+                                    @{
+                                        var envGroups = dbTypeGroup.GroupBy(db => db.Environment);
+                                    }
+                                    @foreach (var envGroup in envGroups)
+                                    {
+                                        <div class="mb-2">
+                                            <strong>@envGroup.Key </strong>
+
+                                            <ul>
+                                                @foreach (var db in envGroup)
+                                                {
+                                                    <li>
+                                                        @db.ServerName  @db.Name
+                                                    </li>
+                                                }
+                                            </ul>
+
+
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                        accIndex++;
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
