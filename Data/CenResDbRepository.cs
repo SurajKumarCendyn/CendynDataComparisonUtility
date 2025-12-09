@@ -1,4 +1,5 @@
 ﻿using CendynDataComparisonUtility.Models.CenResDb;
+using CendynDataComparisonUtility.Models.Dtos;
 using CendynDataComparisonUtility.Utility;
 using Dapper;
 using Microsoft.Data.SqlClient;
@@ -13,11 +14,11 @@ namespace CendynDataComparisonUtility.Service
 
         public IEnumerable<CenResProfiles> GetProfiles(List<Guid> pk_profileIds = null, int feature = 1)
         {
-            var queryBuilder = new StringBuilder( QueryDefinitions.CenResDb.Profiles);
+            var queryBuilder = new StringBuilder(QueryDefinitions.CenResDb.Profiles);
             if (feature == 1 && pk_profileIds != null && pk_profileIds.Count > 0)
             {
                 queryBuilder.Append(" WHERE P.PK_Profiles IN @Ids"); //({string.Join(",", pk_profileIds.Select(id => $"'{id}'"))})
-                queryBuilder.Append (@" GROUP BY
+                queryBuilder.Append(@" GROUP BY
                         P.PK_Profiles,
                         P.Salutation,
                         P.FirstName,
@@ -64,11 +65,11 @@ namespace CendynDataComparisonUtility.Service
             }
 
             using var connection = new SqlConnection(_connectionString);
-            if (feature == 1 && pk_profileIds != null && pk_profileIds.Count > 0) 
-                return connection.Query<CenResProfiles>(queryBuilder.ToString(), new { Ids = pk_profileIds }).ToList(); 
+            if (feature == 1 && pk_profileIds != null && pk_profileIds.Count > 0)
+                return connection.Query<CenResProfiles>(queryBuilder.ToString(), new { Ids = pk_profileIds }).ToList();
             else
                 return connection.Query<CenResProfiles>(queryBuilder.ToString()).ToList();
-       }
+        }
 
         public IEnumerable<CenResReservations> GetReservations(List<Guid> pk_reservationIds = null, int feature = 1)
         {
@@ -90,7 +91,7 @@ namespace CendynDataComparisonUtility.Service
         {
             var queryBuilder = new StringBuilder(QueryDefinitions.CenResDb.StayDetail);
             if (feature == 1 && pk_stayDetailIds != null && pk_stayDetailIds.Count > 0)
-                queryBuilder.Append(" WHERE SD.PK_StayDetail IN @Ids"); 
+                queryBuilder.Append(" WHERE SD.PK_StayDetail IN @Ids");
             else if (feature == 2)
                 queryBuilder.Append(" ORDER BY SD.DateInserted DESC OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY");
 
@@ -115,5 +116,62 @@ namespace CendynDataComparisonUtility.Service
             else
                 return connection.Query<CenResTransactions>(queryBuilder.ToString());
         }
+
+        public List<DbCountRow> GetCenResDbCountRows(string cendynPropertyId = null)
+        {
+            var sql = @"
+        SELECT CendynPropertyId, 'Last 3 years' AS Range, 'Profiles' AS TableName, COUNT(1) AS Count
+        FROM Profiles
+        WHERE (@CendynPropertyId IS NULL OR CendynPropertyId = @CendynPropertyId)
+            AND DatePMSProfileCreated >= DATEADD(YEAR, -3, GETDATE())
+        GROUP BY CendynPropertyId
+        UNION ALL
+        SELECT CendynPropertyId, 'All time', 'Profiles', COUNT(1)
+        FROM Profiles
+        WHERE (@CendynPropertyId IS NULL OR CendynPropertyId = @CendynPropertyId)
+        GROUP BY CendynPropertyId
+        UNION ALL
+        SELECT CendynPropertyId, 'Last 3 years', 'Reservations', COUNT(1)
+        FROM Reservations
+        WHERE (@CendynPropertyId IS NULL OR CendynPropertyId = @CendynPropertyId)
+            AND DateResMade >= DATEADD(YEAR, -3, GETDATE())
+        GROUP BY CendynPropertyId
+        UNION ALL
+        SELECT CendynPropertyId, 'All time', 'Reservations', COUNT(1)
+        FROM Reservations
+        WHERE (@CendynPropertyId IS NULL OR CendynPropertyId = @CendynPropertyId)
+        GROUP BY CendynPropertyId
+        UNION ALL
+        SELECT R.CendynPropertyId, 'Last 3 years', 'StayDetail', COUNT(1)
+        FROM StayDetail SD WITH (NOLOCK)
+            INNER JOIN StayDetailHeader SH WITH(NOLOCK) ON SH.PK_StayDetailHeader = SD.FK_StayDetailHeader
+            INNER JOIN Reservations R WITH(NOLOCK) ON R.PK_Reservations = SH.FK_Reservations
+        WHERE (@CendynPropertyId IS NULL OR R.CendynPropertyId = @CendynPropertyId)
+            AND SD.DateInserted >= DATEADD(YEAR, -3, GETDATE())
+        GROUP BY R.CendynPropertyId
+        UNION ALL
+        SELECT R.CendynPropertyId, 'All time', 'StayDetail', COUNT(1)
+        FROM StayDetail SD WITH (NOLOCK)
+            INNER JOIN StayDetailHeader SH WITH(NOLOCK) ON SH.PK_StayDetailHeader = SD.FK_StayDetailHeader
+            INNER JOIN Reservations R WITH(NOLOCK) ON R.PK_Reservations = SH.FK_Reservations
+        WHERE (@CendynPropertyId IS NULL OR R.CendynPropertyId = @CendynPropertyId)
+        GROUP BY R.CendynPropertyId
+        UNION ALL
+        SELECT CendynPropertyId, 'Last 3 years', 'Transactions', COUNT(1)
+        FROM Transactions WITH (NOLOCK)
+        WHERE (@CendynPropertyId IS NULL OR CendynPropertyId = @CendynPropertyId)
+            AND TransactionDate >= DATEADD(YEAR, -3, GETDATE())
+        GROUP BY CendynPropertyId
+        UNION ALL
+        SELECT CendynPropertyId, 'All time', 'Transactions', COUNT(1)
+        FROM Transactions WITH (NOLOCK)
+        WHERE (@CendynPropertyId IS NULL OR CendynPropertyId = @CendynPropertyId)
+        GROUP BY CendynPropertyId
+    ";
+
+            using var connection = new SqlConnection(_connectionString);
+            return connection.Query<DbCountRow>(sql, new { CendynPropertyId = cendynPropertyId }).ToList();
+        }
+
     }
 }

@@ -109,6 +109,9 @@ namespace CendynDataComparisonUtility.Models.MongoDb
 
         [BsonElement("purchase_stay_details")]
         public List<StayDetail> PurchaseStayDetails { get; set; } = default!;
+
+        [BsonElement("cendyn_property_id")]
+        public string CendynPropertyId { get; set; } = default!;
     }
     
     [BsonIgnoreExtraElements]

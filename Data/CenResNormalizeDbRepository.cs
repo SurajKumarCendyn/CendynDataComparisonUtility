@@ -1,4 +1,5 @@
-﻿using CendynDataComparisonUtility.Models.CenResNormalize;
+﻿using CendynDataComparisonUtility.Models.CenResNormalize; 
+using CendynDataComparisonUtility.Models.Dtos;
 using CendynDataComparisonUtility.Utility;
 using Dapper;
 using Microsoft.Data.SqlClient;
@@ -58,7 +59,50 @@ namespace CendynDataComparisonUtility.Service
             return cenResTransactions;
         }
 
+        public List<DbCountRow> GetCenResNormalizeDbCountRows(List<CendynPropertyMongoHotelIdMapping> propertyIds)
+        {
+            var sql = @"
+        SELECT @CendynPropertyId AS CendynPropertyId, PropertyId AS MongoHotelId, 'Last 3 years' AS Range, 'Profiles' AS TableName, COUNT(1) AS Count
+        FROM CCRM.CUSTOMER
+        WHERE PropertyID IN @PropertyIds AND DateInserted >= DATEADD(YEAR, -3, GETDATE()) GROUP BY PropertyID
+        UNION ALL
+        SELECT @CendynPropertyId AS CendynPropertyId, PropertyId AS MongoHotelId, 'All time' AS Range, 'Profiles' AS TableName, COUNT(1) AS Count
+        FROM CCRM.CUSTOMER
+        WHERE PropertyID IN @PropertyIds GROUP BY PropertyID
 
+        UNION ALL
+        SELECT @CendynPropertyId AS CendynPropertyId, PropertyId AS MongoHotelId, 'Last 3 years' AS Range, 'Reservations' AS TableName, COUNT(1) AS Count
+        FROM CCRM.Stays
+        WHERE PropertyID IN @PropertyIds AND BookingDate >= DATEADD(YEAR, -3, GETDATE()) GROUP BY PropertyID
+        UNION ALL
+        SELECT @CendynPropertyId AS CendynPropertyId, PropertyId AS MongoHotelId, 'All time' AS Range, 'Reservations' AS TableName, COUNT(1) AS Count
+        FROM CCRM.Stays WITH(NOLOCK)
+        WHERE PropertyID IN @PropertyIds GROUP BY PropertyID
+
+        UNION ALL
+        SELECT @CendynPropertyId AS CendynPropertyId, SD.PropertyId AS MongoHotelId, 'Last 3 years' AS Range, 'StayDetail' AS TableName, COUNT(1) AS Count
+        FROM CCRM.StayDetail SD WITH(NOLOCK)
+        WHERE SD.PropertyId IN @PropertyIds AND SD.StayDate >= DATEADD(YEAR, -3, GETDATE())
+        GROUP BY SD.PropertyId
+        UNION ALL
+        SELECT @CendynPropertyId AS CendynPropertyId, SD.PropertyId AS MongoHotelId, 'All time' AS Range, 'StayDetail' AS TableName, COUNT(1) AS Count
+        FROM CCRM.StayDetail SD WITH(NOLOCK)
+        WHERE SD.PropertyId IN @PropertyIds GROUP BY SD.PropertyId
+
+        UNION ALL
+        SELECT @CendynPropertyId AS CendynPropertyId, T.PropertyId AS MongoHotelId, 'Last 3 years' AS Range, 'Transactions' AS TableName, COUNT(1) AS Count
+        FROM CCRM.StayTransactions T WITH(NOLOCK)
+        WHERE T.PropertyId IN @PropertyIds AND T.TransactionDate >= DATEADD(YEAR, -3, GETDATE()) GROUP BY T.PropertyId
+        UNION ALL
+        SELECT @CendynPropertyId AS CendynPropertyId, T.PropertyId AS MongoHotelId, 'All time' AS Range, 'Transactions' AS TableName, COUNT(1) AS Count
+        FROM CCRM.StayTransactions T WITH(NOLOCK)
+        WHERE T.PropertyId IN @PropertyIds GROUP BY T.PropertyId";
+
+            using var connection = new SqlConnection(_connectionString);
+            var cendynPropertyId = propertyIds.FirstOrDefault()?.CendynPropertyId ?? string.Empty;
+            var mongoPropertyIds = propertyIds.Select(x => x.MongoPropertyId).ToList();
+            return connection.Query<DbCountRow>(sql, new { CendynPropertyId = cendynPropertyId, PropertyIds = mongoPropertyIds }).ToList();
+        }
         public class MongoTransactionMapForCenResNDb
         {
             public string Mongo_TransactionId { get; set; }
@@ -66,5 +110,7 @@ namespace CendynDataComparisonUtility.Service
             //Ref
             public Guid Pk_transactions { get; set; }
         }
+
+        
     }
 }

@@ -16,11 +16,14 @@ namespace CendynDataComparisonUtility.Models.MongoDb
         [BsonElement("account_id")]
         public ObjectId AccountId { get; set; } = default!;
 
+        [BsonElement("cendyn_property_id")]
+        public string CendynPropertyId { get; set; } = default!;
+
         [BsonElement("title")]
         public string Title { get; set; }
 
         [BsonElement("name_first")]
-        public string FirstName { get; set; } 
+        public string FirstName { get; set; }
 
         [BsonElement("name_last")]
         public string LastName { get; set; }
@@ -63,10 +66,13 @@ namespace CendynDataComparisonUtility.Models.MongoDb
         public string JobTitle { get; set; }
 
         [BsonElement("allow_email")]
-        public bool AllowEmail { get; set; }        
+        public bool AllowEmail { get; set; }
 
         [BsonElement("allow_mail")]
         public bool AllowMail { get; set; }
         public Guid Pk_Profiles { get; set; }
+
+        [BsonElement("hotel_id")]
+        public ObjectId HotelId { get; set; } = default!;
     }
 }

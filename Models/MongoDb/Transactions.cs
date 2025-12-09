@@ -19,6 +19,9 @@ namespace CendynDataComparisonUtility.Models.MongoDb
         [BsonElement("external_res_id1")]
         public string ExternalResId1 { get; set; } = default!;
 
+        [BsonElement("cendyn_property_id")]
+        public string CendynPropertyId { get; set; } = default!;
+
         [BsonElement("transaction_source")]
         public string TransactionSource { get; set; } = default!;
 

@@ -1,4 +1,5 @@
-﻿using CendynDataComparisonUtility.Models.MongoDb;
+﻿using CendynDataComparisonUtility.Models.Dtos;
+using CendynDataComparisonUtility.Models.MongoDb;
 using CendynDataComparisonUtility.Utility; 
 using MongoDB.Bson;
 using MongoDB.Driver;
@@ -94,6 +95,67 @@ namespace CendynDataComparisonUtility.Data
             var cursor = transactionsCollection.Find(filter);
             var transactions = cursor.ToList();
             return transactions;
+        }
+
+
+        public List<DbCountRow> GetMongoDbCountRows(List<string> cendynPropertyIds)
+        {
+            var result = new List<DbCountRow>();
+            var mongoClient = new MongoClient(_connectionString);
+            var db = mongoClient.GetDatabase(_mongoDbName);
+
+            var contactsCollection = db.GetCollection<Contacts>(QueryDefinitions.MongoDb.ContactsCollection);
+            var purchasesCollection = db.GetCollection<Purchases>(QueryDefinitions.MongoDb.PurchasesCollection);
+            var stayDetailsCollection = db.GetCollection<StayDetail>(QueryDefinitions.MongoDb.PurchasesCollection);
+            var transactionsCollection = db.GetCollection<Transactions>(QueryDefinitions.MongoDb.TransactionsCollection);
+
+            foreach (var propertyId in cendynPropertyIds)
+            {
+                // Profiles
+                var profileFilter = Builders<Contacts>.Filter.Eq(c => c.CendynPropertyId, propertyId);
+                var profilesLast3Years = contactsCollection.CountDocuments(
+                    profileFilter & Builders<Contacts>.Filter.Gte("DateInserted", DateTime.UtcNow.AddYears(-3))
+                );
+                var profilesAll = contactsCollection.CountDocuments(profileFilter);
+
+                //get hotelId for the cendyn property id
+                var hotelId = contactsCollection
+                .Find(Builders<Contacts>.Filter.Eq(c => c.CendynPropertyId, propertyId))
+                .Project(c => c.HotelId)
+                .FirstOrDefault();
+
+                result.Add(new DbCountRow { CendynPropertyId = propertyId, MongoHotelId =hotelId.ToString(), Range = "Last 3 years", TableName = "Profiles", Count = (int)profilesLast3Years });
+                result.Add(new DbCountRow { CendynPropertyId = propertyId, MongoHotelId = hotelId.ToString(), Range = "All time", TableName = "Profiles", Count = (int)profilesAll });
+
+                // Reservations
+                var reservationFilter = Builders<Purchases>.Filter.Eq(p => p.Uuid_CendynPropertyID, propertyId);
+                var reservationsLast3Years = purchasesCollection.CountDocuments(
+                    reservationFilter & Builders<Purchases>.Filter.Gte("BookingDate", DateTime.UtcNow.AddYears(-3))
+                );
+                var reservationsAll = purchasesCollection.CountDocuments(reservationFilter);
+                result.Add(new DbCountRow { CendynPropertyId = propertyId, MongoHotelId = hotelId.ToString(), Range = "Last 3 years", TableName = "Reservations", Count = (int)reservationsLast3Years });
+                result.Add(new DbCountRow { CendynPropertyId = propertyId, MongoHotelId = hotelId.ToString(), Range = "All time", TableName = "Reservations", Count = (int)reservationsAll });
+
+                // StayDetail
+                var stayDetailFilterByProp = Builders<StayDetail>.Filter.Eq(sd => sd.Uuid_CendynPropertyID, propertyId);
+                var stayDetailLast3Years = stayDetailsCollection.CountDocuments(
+                    stayDetailFilterByProp & Builders<StayDetail>.Filter.Gte("StayDate", DateTime.UtcNow.AddYears(-3))
+                );
+                var stayDetailAll = stayDetailsCollection.CountDocuments(stayDetailFilterByProp);
+                result.Add(new DbCountRow { CendynPropertyId = propertyId, MongoHotelId = hotelId.ToString(),Range = "Last 3 years", TableName = "StayDetail", Count = (int)stayDetailLast3Years });
+                result.Add(new DbCountRow { CendynPropertyId = propertyId, MongoHotelId = hotelId.ToString(), Range = "All time", TableName = "StayDetail", Count = (int)stayDetailAll });
+
+                // Transactions
+                var transactionFilter = Builders<Transactions>.Filter.Eq(t => t.CendynPropertyId, propertyId);
+                var transactionsLast3Years = transactionsCollection.CountDocuments(
+                    transactionFilter & Builders<Transactions>.Filter.Gte("TransactionDate", DateTime.UtcNow.AddYears(-3))
+                );
+                var transactionsAll = transactionsCollection.CountDocuments(transactionFilter);
+                result.Add(new DbCountRow { CendynPropertyId = propertyId, MongoHotelId = hotelId.ToString(), Range = "Last 3 years", TableName = "Transactions", Count = (int)transactionsLast3Years });
+                result.Add(new DbCountRow { CendynPropertyId = propertyId, MongoHotelId = hotelId.ToString(), Range = "All time", TableName = "Transactions", Count = (int)transactionsAll });
+            }
+
+            return result;
         }
 
 

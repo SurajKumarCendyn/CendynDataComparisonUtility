@@ -2,15 +2,14 @@
 using CendynDataComparisonUtility.Models;
 using CendynDataComparisonUtility.Models.CenResDb;
 using CendynDataComparisonUtility.Models.ClientDb;
+using CendynDataComparisonUtility.Models.Dtos;
 using CendynDataComparisonUtility.Service;
-using CendynDataComparisonUtility.Utility;
 using ClosedXML.Excel;
 using Dapper;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using MongoDB.Driver;
 using Newtonsoft.Json;
-using System.Text;
 using static CendynDataComparisonUtility.Data.MongoDbRepository;
 using static CendynDataComparisonUtility.Service.CenResNormalizeDbRepository;
 
@@ -24,7 +23,7 @@ namespace CendynDataComparisonUtility.Controllers
         readonly string[] dbsList = ["eInAppDb", "CenResDb", "MongoDb", "CenResNormalizeDb"];
         public UtilityController(IConfiguration config)
         {
-            _config = config; 
+            _config = config;
         }
         public IActionResult Index(string searchString)
         {
@@ -200,225 +199,96 @@ namespace CendynDataComparisonUtility.Controllers
             }
         }
 
-        public IActionResult DataComparison(string searchString, int feature)
+
+        [HttpGet("Utility/VolumeBasedResult")]
+        public FileContentResult VolumeBasedResult()
         {
-            if (string.IsNullOrEmpty(searchString))
-            {
-                return RedirectToAction("Index");
-            }
-            if (feature < 0 || feature > 3)
-            {
-                return RedirectToAction("Index");
-            }
+            // EInDb counts
+            //string einConnStr = "Server=QDB-D1001.CENTRALSERVICES.LOCAL;Database=eInsightCRM_Origami_QA;Integrated Security=True;TrustServerCertificate=True;";
+            //var einRepo = new EInDbRepository(einConnStr);
+            //var einRows = einRepo.GetEInDbCountRows();
+            var einRows = new List<DbCountRow>(); // Temporarily disable EInDb counts
 
-            if (feature == 1)
-            {
-                var avlConnection = JsonConvert.DeserializeObject<List<AvailableConnectionInformation>>(TempData["AvlConnection"].ToString());
-                var viewModel = new UtilityViewModel()
-                {
-                    SearchString = string.IsNullOrEmpty(searchString) ? string.Empty : searchString,
-                    DatabaseInfo = Databases,
-                    ConnectionInformation = avlConnection
-                };
-                return View(viewModel);
-            }
-            return RedirectToAction("Index");
-        }
+            // CenResDb counts
+            string cenResConnStr = "Server=QDB-D1007.CENTRALSERVICES.LOCAL;Database=CenRes_QA_Test;Integrated Security=True;TrustServerCertificate=True;";
+            var cenResRepo = new CenResDbRepository(cenResConnStr);
+            var cenResRows = cenResRepo.GetCenResDbCountRows("1054");
+            var cendynPropertyIds = cenResRows.Select(r => r.CendynPropertyId).Distinct().ToList();
 
-        [HttpPost]
-        public FileContentResult VolumeBasedResult(RecordSelectionModel model)
-        {
-            //Get CenRes ReservationCount
-            var avlConnection = JsonConvert.DeserializeObject<List<AvailableConnectionInformation>>(TempData["AvlConnection"].ToString());
+            // MongoDb counts
+            string mongoConnStr = "mongodb+srv://int_skumar:asdj3928ASDk2q*2as@stg-mongo-cluster-01.kk0bg.mongodb.net/";
+            string mongoDbName = "push_platform_stg";
+            string parentCompanyId = "67371b9bd167a7000161f496";
 
-            string cenResProfilesQuery = "SELECT COUNT(1) FROM V_PROFILES WITH(NOLOCK)"; //CenRes Profiles Counts
-            string cenResReservationCountQuery = "SELECT COUNT(1) FROM V_RESERVATIONS WITH(NOLOCK)"; //CenRes Reservation Counts
-            string cenResNightlyRatesQuery = "SELECT COUNT(1) FROM V_StayDetail WITH(NOLOCK)";  //CenRes Nightly Rates Counts
-            string cenResTransactionsQuery = "SELECT COUNT(1) FROM V_StayDetail WITH(NOLOCK)"; //CenRes Transactions Counts
-            if (model.TimeFrame == TimeFrame.Last3Years)
-            {
-                cenResProfilesQuery += " WHERE DateInserted >= DATEADD(YEAR, -3, GETDATE())";
-                cenResReservationCountQuery += " WHERE DateInserted >= DATEADD(YEAR, -3, GETDATE())";
-                cenResNightlyRatesQuery += " WHERE DateInserted >= DATEADD(YEAR, -3, GETDATE())";
-                cenResTransactionsQuery += " WHERE DateInserted >= DATEADD(YEAR, -3, GETDATE())";
-            }
-            string cenresConnStr = FormatConnectionString(avlConnection.FirstOrDefault(c => c.DatabaseCType == "CenResDb"));
-            using var cenresConnection = new SqlConnection(cenresConnStr);
-            cenresConnection.Open();
-            var profileCount = cenresConnection.ExecuteScalar<int>(cenResProfilesQuery);
-            var reservationCount = cenresConnection.ExecuteScalar<int>(cenResReservationCountQuery);
-            var nightlyRatesCount = cenresConnection.ExecuteScalar<int>(cenResNightlyRatesQuery);
-            var transactionsCount = cenresConnection.ExecuteScalar<int>(cenResTransactionsQuery);
+            var mongoRepo = new MongoDbRepository(mongoConnStr, mongoDbName, parentCompanyId);
+            var mongoRows = mongoRepo.GetMongoDbCountRows(cendynPropertyIds);
 
-
-            ////Get Counts from MongoDb
-            //var mongoConnInfo = avlConnection.FirstOrDefault(c => c.DatabaseCType == "MongoDb");
-            //var mongoClient = new MongoClient(mongoConnInfo.ConnectionString);
-            //string mongoDbName = mongoConnInfo.DatabaseName.Replace("metadata_", "");
-            //var db = mongoClient.GetDatabase(mongoDbName);
-
-            //var profilesCollection = db.GetCollection<Models.MongoDb.Contacts>("contacts");
-            //var builder = Builders<Models.MongoDb.Contacts>.Filter;
-            //var filter = builder.Eq(c => c.AccountId, mongoConnInfo.ParentCompanyId);
-
-            //if (model.TimeFrame == TimeFrame.Last3Years)
-            //{
-            //    var dateFilter = builder.Gte("d", DateTime.UtcNow.AddYears(-3));
-            //    filter = builder.And(filter, dateFilter);
-            //}
-
-            //var mongoProfileCount = profilesCollection.CountDocuments(filter);
-
-            ////purchases count
-            //var purchasesCollection = db.GetCollection<Models.MongoDb.Purchases>("purchases");
-            //var purchaseFilterbuilder = Builders<Models.MongoDb.Purchases>.Filter;
-            //var purchaseFilter = purchaseFilterbuilder.Eq(p => p.AccountId, mongoConnInfo.ParentCompanyId);
-            //if (model.TimeFrame == TimeFrame.Last3Years)
-            //{
-            //    var dateFilter = purchaseFilterbuilder.Gte("d", DateTime.UtcNow.AddYears(-3));
-            //    purchaseFilter = purchaseFilterbuilder.And(purchaseFilter, dateFilter);
-            //}
-            //var mongoPurchasesCount = purchasesCollection.CountDocuments(purchaseFilter);
+            var mongoPropertyId = mongoRows
+                                .GroupBy(x => x.CendynPropertyId)
+                                .Select(g => new CendynPropertyMongoHotelIdMapping
+                                {
+                                    CendynPropertyId = g.Key,
+                                    MongoPropertyId = g.Select(x => x.MongoHotelId).FirstOrDefault()
+                                })
+                                .ToList();
+            // CenResNormalizeDb counts
+            string normConnStr = "Server=ddbeus2bi01.CENTRALSERVICES.LOCAL;Database=CCRMBIStaging_Normalized_QA;Integrated Security=True;TrustServerCertificate=True;";
+            var normRepo = new CenResNormalizeDbRepository(normConnStr);
+            var normRows = normRepo.GetCenResNormalizeDbCountRows(mongoPropertyId);
 
             using var wb = new XLWorkbook();
-            var ws = wb.Worksheets.Add("Volume Based Report");
-            ws.Cell(1, 1).Value = "Data Type";
-            ws.Cell(1, 2).Value = "CenResDb Counts";
-            ws.Cell(1, 3).Value = "MongoDb Counts";
-            ws.Cell(1, 4).Value = "NormalizeDb Counts";
-            //Profile Data Counts
-            ws.Cell(2, 1).Value = "Profiles";
-            ws.Cell(2, 2).Value = profileCount;
-            ws.Cell(2, 3).Value = "MongoProfileCount";
-            ws.Cell(2, 4).Value = "NormalizeProfileCount";
-            //Reservation Data Counts
-            ws.Cell(3, 1).Value = "Reservations";
-            ws.Cell(3, 2).Value = reservationCount;
-            ws.Cell(3, 3).Value = "MongoReservationsCount";
-            ws.Cell(3, 4).Value = "NormalizeReservationsCount";
-            //Nightly Rates Data Counts
-            ws.Cell(4, 1).Value = "Nightly Rates";
-            ws.Cell(4, 2).Value = nightlyRatesCount;
-            ws.Cell(4, 3).Value = "MongoNightlyRatesCount";
-            ws.Cell(4, 4).Value = "NormalizeNightlyRatesCount";
-            //Transactions Data Counts
-            ws.Cell(5, 1).Value = "Transactions";
-            ws.Cell(5, 2).Value = transactionsCount;
-            ws.Cell(5, 3).Value = "MongoTransactionsCount";
-            ws.Cell(5, 4).Value = "NormalizeTransactionsCount";
+            var ws = wb.Worksheets.Add("VolumeBasedResult");
+
+            // Header
+            ws.Cell(1, 1).Value = "Property ID";
+            ws.Cell(1, 2).Value = "Range";
+            ws.Cell(1, 3).Value = "Table Name";
+            ws.Cell(1, 4).Value = "eInsight";
+            ws.Cell(1, 5).Value = "CenRes";
+            ws.Cell(1, 6).Value = "MongoDb";
+            ws.Cell(1, 7).Value = "CenResNormalize";
+
+            // Group by PropertyId, Range, TableName
+            var allRows = cenResRows
+                .Concat(einRows)
+                .Concat(normRows)
+                .Concat(mongoRows)
+                .GroupBy(r => new { r.CendynPropertyId, r.Range, r.TableName })
+                .Select(g => new
+                {
+                    PropertyId = g.Key.CendynPropertyId,
+                    Range = g.Key.Range,
+                    TableName = g.Key.TableName,
+                    EInDb = einRows?.FirstOrDefault(x => x.CendynPropertyId == g.Key.CendynPropertyId && x.Range == g.Key.Range && x.TableName == g.Key.TableName)?.Count ?? 0,
+                    CenResDb = cenResRows.FirstOrDefault(x => x.CendynPropertyId == g.Key.CendynPropertyId && x.Range == g.Key.Range && x.TableName == g.Key.TableName)?.Count ?? 0,
+                    MongoDb = mongoRows.FirstOrDefault(x => x.CendynPropertyId == g.Key.CendynPropertyId && x.Range == g.Key.Range && x.TableName == g.Key.TableName)?.Count ?? 0,
+                    CenResNormalizeDb = normRows.FirstOrDefault(x => x.CendynPropertyId == g.Key.CendynPropertyId && x.Range == g.Key.Range && x.TableName == g.Key.TableName)?.Count ?? 0
+                })
+                .OrderBy(x => x.PropertyId)
+                .ThenBy(x => x.TableName)
+                .ThenBy(x => x.Range)
+                .ToList();
+
+            int row = 2;
+            foreach (var item in allRows)
+            {
+                ws.Cell(row, 1).Value = item.PropertyId;
+                ws.Cell(row, 2).Value = item.Range;
+                ws.Cell(row, 3).Value = item.TableName;
+                ws.Cell(row, 4).Value = item.EInDb;
+                ws.Cell(row, 5).Value = item.CenResDb;
+                ws.Cell(row, 6).Value = item.MongoDb;
+                ws.Cell(row, 7).Value = item.CenResNormalizeDb;
+                row++;
+            }
 
             ws.Columns().AdjustToContents();
+            ws.SheetView.FreezeRows(1);
+
             using var stream = new MemoryStream();
             wb.SaveAs(stream);
             stream.Position = 0;
-            return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "VolumeBasedReport.xlsx");
-        }
-
-        [HttpGet]
-        public IActionResult GetNewResult()
-        {
-            //SELECT TOP 100 Records from CenResDb for Tables Profiles, Reservations, StayDetails, Transactions
-            var cenRes_ProfileQuery = new StringBuilder(QueryDefinitions.CenResDb.Profiles);
-            cenRes_ProfileQuery.Append(" WHERE CendynPropertyId='1054'"); //Hardcode for testing
-            cenRes_ProfileQuery.Append(@" GROUP BY
-                        P.PK_Profiles,
-                        P.Salutation,
-                        P.FirstName,
-                        P.LastName,
-                        P.ExternalProfileID,
-                        P.CendynPropertyId,
-                        P.ExternalProfileID2,
-                        AD.Address1,
-                        AD.City,
-                        AD.StateProvince,
-                        AD.PostalCode,
-                        AD.CountryCode,
-                        P.Nationality,
-                        P.PrimaryLanguage,
-                        P.CompanyName,
-                        P.AllowMail,
-                        P.AllowEmail,
-                        P.JobTitle,
-                        P.DateInserted");
-            cenRes_ProfileQuery.Append(" ORDER BY P.DateInserted DESC OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY");
-
-            var cenRes_ProfileRandom100Query = new StringBuilder(QueryDefinitions.CenResDb.Profiles);
-            cenRes_ProfileRandom100Query.Append(" WHERE CendynPropertyId='1054'");
-            cenRes_ProfileRandom100Query.Append(@" GROUP BY
-                        P.PK_Profiles,
-                        P.Salutation,
-                        P.FirstName,
-                        P.LastName,
-                        P.ExternalProfileID,
-                        P.CendynPropertyId,
-                        P.ExternalProfileID2,
-                        AD.Address1,
-                        AD.City,
-                        AD.StateProvince,
-                        AD.PostalCode,
-                        AD.CountryCode,
-                        P.Nationality,
-                        P.PrimaryLanguage,
-                        P.CompanyName,
-                        P.AllowMail,
-                        P.AllowEmail,
-                        P.JobTitle,
-                        P.DateInserted");
-            cenRes_ProfileRandom100Query.Append(" ORDER BY NEWID() OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY");
-
-            var cenRes_ReservationQuery = new StringBuilder(QueryDefinitions.CenResDb.Reservations);
-            cenRes_ReservationQuery.Append(" WHERE CendynPropertyId='1054'"); 
-            cenRes_ReservationQuery.Append(" ORDER BY R.DateInserted DESC OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY");
-
-            var cenRes_ReservationRandom100Query = new StringBuilder(QueryDefinitions.CenResDb.Reservations);
-            cenRes_ReservationRandom100Query.Append(" WHERE CendynPropertyId='1054'");
-            cenRes_ReservationRandom100Query.Append(" ORDER BY NEWID() OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY");
-
-           var cenRes_StayDetailQuery = new StringBuilder(QueryDefinitions.CenResDb.StayDetail);
-           cenRes_StayDetailQuery.Append(" WHERE R.CendynPropertyId='1054'");
-            cenRes_StayDetailQuery.Append(" ORDER BY SD.DateInserted DESC OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY");
-
-            var cenRes_StayDetailRandom100Query = new StringBuilder(QueryDefinitions.CenResDb.StayDetail);
-            cenRes_StayDetailRandom100Query.Append(" WHERE R.CendynPropertyId='1054'");
-            cenRes_StayDetailRandom100Query.Append(" ORDER BY NEWID() OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY");
-
-
-            var cenRes_TransactionsQuery = new StringBuilder(QueryDefinitions.CenResDb.Transactions);
-            cenRes_TransactionsQuery.Append(" WHERE CendynPropertyId='1054'");
-            cenRes_TransactionsQuery.Append(" ORDER BY T.DateInserted DESC OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY");
-
-            var cenRes_TransactionsRandom100Query = new StringBuilder(QueryDefinitions.CenResDb.Transactions);
-            cenRes_TransactionsRandom100Query.Append(" WHERE CendynPropertyId='1054'");
-            cenRes_TransactionsRandom100Query.Append(" ORDER BY NEWID() OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY");
-
-            //select multi data using dapper from cenres db
-            string CenRes_connectionString = "Server=QDB-D1007.CENTRALSERVICES.LOCAL;Database=CenRes_QA_Test;Integrated Security=True;TrustServerCertificate=True;";
-            using var connection = new SqlConnection(CenRes_connectionString);
-            connection.Open();
-            using var multi = connection.QueryMultiple(
-                cenRes_ProfileQuery.ToString() + ";" +
-                cenRes_ProfileRandom100Query.ToString() + ";" +
-                cenRes_ReservationQuery.ToString() + ";" +
-                cenRes_ReservationRandom100Query.ToString() + ";" +
-                cenRes_StayDetailQuery.ToString() + ";" +
-                cenRes_StayDetailRandom100Query.ToString() + ";" +
-                cenRes_TransactionsQuery.ToString() + ";" +
-                cenRes_TransactionsRandom100Query.ToString());
-
-            var cenRes_Profiles = multi.Read<CenResProfiles>().ToList();
-            var cenRes_ProfilesRandom100 = multi.Read<CenResProfiles>().ToList();
-            var cenRes_Reservations = multi.Read<CenResReservations>().ToList();
-            var cenRes_ReservationsRandom100 = multi.Read<CenResReservations>().ToList();
-            var cenRes_StayDetails = multi.Read<CenResStayDetail>().ToList();
-            var cenRes_StayDetailsRandom100 = multi.Read<CenResStayDetail>().ToList();
-            var cenRes_Transactions = multi.Read<CenResTransactions>().ToList();
-            var cenRes_TransactionsRandom100 = multi.Read<CenResTransactions>().ToList();
-
-
-
-
-
-            return View();
+            return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "VolumeBasedResult.xlsx");
         }
 
         /// <summary>
@@ -593,7 +463,7 @@ namespace CendynDataComparisonUtility.Controllers
                     CenResNormalizeDbValue = norm?.FirstName
                 });
                 comparisonRows.Add(new FieldComparisonRow
-                { 
+                {
                     PropertyId = cen?.CendynPropertyId,
                     ExternalId1 = cen.ExternalProfileID,
                     ExternalId2OrTransactionId = cen.ExternalProfileID2,
@@ -854,7 +724,7 @@ namespace CendynDataComparisonUtility.Controllers
             var cenResN_Reservations = cenResNRepo.GetReservation(parentCompanyId, puchaseIds);
 
             #endregion
-       
+
             // Collect keys from each source   // Resevation id is common in ein()
             var eInKeys = eIn_Reservations?.Select(c => c.ReservationNumber);
             var cenKeys = cenRes_Reservations?.Select(p => p.ReservationNumber);
@@ -883,7 +753,7 @@ namespace CendynDataComparisonUtility.Controllers
                     PropertyId = cen?.CendynPropertyID,
                     ExternalId1 = cen.ReservationNumber,
                     ExternalId2OrTransactionId = cen.ExternalResID2,
-                    StayDateOrTransactionDate =cen?.ArrivalDate,
+                    StayDateOrTransactionDate = cen?.ArrivalDate,
                     TableName = "Reservations",
                     FieldName = "Sub Reservation Number",
                     EInDbValue = ein?.SubReservationNumber,
@@ -1326,7 +1196,7 @@ namespace CendynDataComparisonUtility.Controllers
                     CenResNormalizeDbValue = norm?.StayRoomType
                 });
                 comparisonRows.Add(new FieldComparisonRow
-                { 
+                {
                     PropertyId = cen?.CendynPropertyId,
                     ExternalId1 = cen.ReservationNumber,
                     ExternalId2OrTransactionId = "", //check this field
@@ -1339,7 +1209,7 @@ namespace CendynDataComparisonUtility.Controllers
                     CenResNormalizeDbValue = norm?.StayRateAmount
                 });
                 comparisonRows.Add(new FieldComparisonRow
-                { 
+                {
                     PropertyId = cen?.CendynPropertyId,
                     ExternalId1 = cen.ReservationNumber,
                     ExternalId2OrTransactionId = "", //check this field
@@ -1365,7 +1235,7 @@ namespace CendynDataComparisonUtility.Controllers
                     CenResNormalizeDbValue = norm?.CurrencyCode
                 });
             }
-            return comparisonRows; 
+            return comparisonRows;
         }
         private static List<FieldComparisonRow> CreateTransactionsSheet(int featureSet)
         {
@@ -1527,7 +1397,7 @@ namespace CendynDataComparisonUtility.Controllers
                 });
 
             }
-            return comparisonRows; 
+            return comparisonRows;
         }
 
         private static string BuildMongoUserId(CenResProfiles profile)
