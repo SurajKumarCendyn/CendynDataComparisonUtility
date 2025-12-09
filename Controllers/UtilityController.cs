@@ -16,6 +16,7 @@ using static CendynDataComparisonUtility.Service.CenResNormalizeDbRepository;
 
 namespace CendynDataComparisonUtility.Controllers
 {
+
     public class UtilityController : Controller
     {
         private readonly IConfiguration _config;
@@ -223,6 +224,7 @@ namespace CendynDataComparisonUtility.Controllers
             }
             return RedirectToAction("Index");
         }
+
         [HttpPost]
         public FileContentResult VolumeBasedResult(RecordSelectionModel model)
         {
@@ -425,19 +427,99 @@ namespace CendynDataComparisonUtility.Controllers
         /// <returns></returns> 
         [HttpGet("Utility/CompareData")]
         public FileContentResult CompareData([FromQuery] int featureSet = 1, [FromQuery] string searchString = null)
-        { 
+        {
             using var wb = new XLWorkbook();
-            CreateProfilesSheet(wb, featureSet);
-            CreateReservationsSheet(wb, featureSet);
-            CreateStayDetailsSheet(wb, featureSet);
-            CreateTransactionsSheet(wb, featureSet);
+            var ws = wb.Worksheets.Add("TOP 100 Records");
+            ws.Cell(1, 1).Value = "PropertyId";
+            ws.Cell(1, 2).Value = "ExternalId1";
+            ws.Cell(1, 3).Value = "ExternalId2/TransactionId";
+            ws.Cell(1, 4).Value = "Stay Date/Transaction Date";
+            ws.Cell(1, 5).Value = "Table Name";
+            ws.Cell(1, 6).Value = "Field Name";
+            ws.Cell(1, 7).Value = "eInDb";
+            ws.Cell(1, 8).Value = "CenResDb";
+            ws.Cell(1, 9).Value = "MongoDb";
+            ws.Cell(1, 10).Value = "CenResNormalizeDb";
+
+            int rowIndex = 2;
+
+            // Profiles
+            var profilesData = CreateProfilesSheet(featureSet);
+            foreach (var row in profilesData)
+            {
+                ws.Cell(rowIndex, 1).Value = row.PropertyId;
+                ws.Cell(rowIndex, 2).Value = row.ExternalId1;
+                ws.Cell(rowIndex, 3).Value = row.ExternalId2OrTransactionId;
+                ws.Cell(rowIndex, 4).Value = ""; // No Stay Date for Profiles
+                ws.Cell(rowIndex, 5).Value = row.TableName;
+                ws.Cell(rowIndex, 6).Value = row.FieldName;
+                ws.Cell(rowIndex, 7).Value = row?.EInDbValue ?? string.Empty;
+                ws.Cell(rowIndex, 8).Value = row?.CenResDbValue ?? string.Empty;
+                ws.Cell(rowIndex, 9).Value = row?.MongoDbValue ?? string.Empty;
+                ws.Cell(rowIndex, 10).Value = row?.CenResNormalizeDbValue ?? string.Empty;
+                rowIndex++;
+            }
+
+            // Reservations
+            var reservationsData = CreateReservationsSheet(featureSet);
+            foreach (var row in reservationsData)
+            {
+                ws.Cell(rowIndex, 1).Value = row.PropertyId;
+                ws.Cell(rowIndex, 2).Value = row.ExternalId1;
+                ws.Cell(rowIndex, 3).Value = row.ExternalId2OrTransactionId;
+                ws.Cell(rowIndex, 4).Value = row.StayDateOrTransactionDate?.ToString() ?? "";
+                ws.Cell(rowIndex, 5).Value = row.TableName;
+                ws.Cell(rowIndex, 6).Value = row.FieldName;
+                ws.Cell(rowIndex, 7).Value = row?.EInDbValue ?? string.Empty;
+                ws.Cell(rowIndex, 8).Value = row?.CenResDbValue ?? string.Empty;
+                ws.Cell(rowIndex, 9).Value = row?.MongoDbValue ?? string.Empty;
+                ws.Cell(rowIndex, 10).Value = row?.CenResNormalizeDbValue ?? string.Empty;
+                rowIndex++;
+            }
+
+            // StayDetails
+            var stayDetailsData = CreateStayDetailsSheet(featureSet);
+            foreach (var row in stayDetailsData)
+            {
+                ws.Cell(rowIndex, 1).Value = row.PropertyId;
+                ws.Cell(rowIndex, 2).Value = row.ExternalId1;
+                ws.Cell(rowIndex, 3).Value = row.ExternalId2OrTransactionId;
+                ws.Cell(rowIndex, 4).Value = row.StayDateOrTransactionDate?.ToString("yyyy-MM-dd HH:mm:ss") ?? "";
+                ws.Cell(rowIndex, 5).Value = row.TableName;
+                ws.Cell(rowIndex, 6).Value = row.FieldName;
+                ws.Cell(rowIndex, 7).Value = row?.EInDbValue ?? string.Empty;
+                ws.Cell(rowIndex, 8).Value = row?.CenResDbValue ?? string.Empty;
+                ws.Cell(rowIndex, 9).Value = row?.MongoDbValue ?? string.Empty;
+                ws.Cell(rowIndex, 10).Value = row.StayDateOrTransactionDate?.ToString("yyyy-MM-dd HH:mm:ss") ?? "";
+                rowIndex++;
+            }
+
+            // Transactions
+            var transactionsData = CreateTransactionsSheet(featureSet);
+            foreach (var row in transactionsData)
+            {
+                ws.Cell(rowIndex, 1).Value = row.PropertyId;
+                ws.Cell(rowIndex, 2).Value = row.ExternalId1;
+                ws.Cell(rowIndex, 3).Value = row.ExternalId2OrTransactionId;
+                ws.Cell(rowIndex, 4).Value = row.StayDateOrTransactionDate?.ToString() ?? "";
+                ws.Cell(rowIndex, 5).Value = row.TableName;
+                ws.Cell(rowIndex, 6).Value = row.FieldName;
+                ws.Cell(rowIndex, 7).Value = row?.EInDbValue ?? string.Empty;
+                ws.Cell(rowIndex, 8).Value = row?.CenResDbValue ?? string.Empty;
+                ws.Cell(rowIndex, 9).Value = row?.MongoDbValue ?? string.Empty;
+                ws.Cell(rowIndex, 10).Value = row?.CenResNormalizeDbValue ?? string.Empty;
+                rowIndex++;
+            }
+
+            ws.Columns().AdjustToContents();
+            ws.SheetView.FreezeRows(1);
             using var stream = new MemoryStream();
             wb.SaveAs(stream);
             stream.Position = 0;
             return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "DataComparison.xlsx");
         }
-         
-        private static void CreateProfilesSheet(XLWorkbook wb, int featureSet)
+
+        private static List<FieldComparisonRow> CreateProfilesSheet(int featureSet)
         {
             string parentCompanyId = "67371b9bd167a7000161f496";
             var (eInRepo, cenResRepo, mongoRepo, cenResNRepo) = CreateAllRepositories();
@@ -500,9 +582,10 @@ namespace CendynDataComparisonUtility.Controllers
 
                 comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key.ToString(),
                     PropertyId = cen?.CendynPropertyId,
-                    ProfileId = cen.ExternalProfileID,
+                    ExternalId1 = cen.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    TableName = "Profiles",
                     FieldName = "First Name",
                     EInDbValue = ein?.FirstName,
                     CenResDbValue = cen?.FirstName,
@@ -510,10 +593,11 @@ namespace CendynDataComparisonUtility.Controllers
                     CenResNormalizeDbValue = norm?.FirstName
                 });
                 comparisonRows.Add(new FieldComparisonRow
-                {
-                    Key = key.ToString(),
+                { 
                     PropertyId = cen?.CendynPropertyId,
-                    ProfileId = cen.ExternalProfileID,
+                    ExternalId1 = cen.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    TableName = "Profiles",
                     FieldName = "Last Name",
                     EInDbValue = ein?.LastName,
                     CenResDbValue = cen?.LastName,
@@ -522,9 +606,10 @@ namespace CendynDataComparisonUtility.Controllers
                 });
                 comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key.ToString(),
                     PropertyId = cen?.CendynPropertyId,
-                    ProfileId = cen.ExternalProfileID,
+                    ExternalId1 = cen.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    TableName = "Profiles",
                     FieldName = "Salutation",
                     EInDbValue = ein?.Salutation,
                     CenResDbValue = cen?.Salutation,
@@ -533,9 +618,10 @@ namespace CendynDataComparisonUtility.Controllers
                 });
                 comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key.ToString(),
                     PropertyId = cen?.CendynPropertyId,
-                    ProfileId = cen.ExternalProfileID,
+                    ExternalId1 = cen.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    TableName = "Profiles",
                     FieldName = "Address1",
                     EInDbValue = ein?.Address1,
                     CenResDbValue = cen?.Address1,
@@ -544,9 +630,10 @@ namespace CendynDataComparisonUtility.Controllers
                 });
                 comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key.ToString(),
                     PropertyId = cen?.CendynPropertyId,
-                    ProfileId = cen.ExternalProfileID,
+                    ExternalId1 = cen.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    TableName = "Profiles",
                     FieldName = "City",
                     EInDbValue = ein?.City,
                     CenResDbValue = cen?.City,
@@ -555,9 +642,10 @@ namespace CendynDataComparisonUtility.Controllers
                 });
                 comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key.ToString(),
                     PropertyId = cen?.CendynPropertyId,
-                    ProfileId = cen.ExternalProfileID,
+                    ExternalId1 = cen.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    TableName = "Profiles",
                     FieldName = "StateProvinceCode",
                     EInDbValue = ein?.StateProvinceCode,
                     CenResDbValue = cen?.StateProvince,
@@ -566,9 +654,10 @@ namespace CendynDataComparisonUtility.Controllers
                 });
                 comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key.ToString(),
                     PropertyId = cen?.CendynPropertyId,
-                    ProfileId = cen.ExternalProfileID,
+                    ExternalId1 = cen.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    TableName = "Profiles",
                     FieldName = "ZipCode",
                     EInDbValue = ein?.ZipCode,
                     CenResDbValue = cen?.PostalCode,
@@ -577,9 +666,10 @@ namespace CendynDataComparisonUtility.Controllers
                 });
                 comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key.ToString(),
                     PropertyId = cen?.CendynPropertyId,
-                    ProfileId = cen.ExternalProfileID,
+                    ExternalId1 = cen.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    TableName = "Profiles",
                     FieldName = "CountryCode",
                     EInDbValue = ein?.CountryCode,
                     CenResDbValue = cen?.CountryCode,
@@ -588,9 +678,10 @@ namespace CendynDataComparisonUtility.Controllers
                 });
                 comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key.ToString(),
                     PropertyId = cen?.CendynPropertyId,
-                    ProfileId = cen.ExternalProfileID,
+                    ExternalId1 = cen.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    TableName = "Profiles",
                     FieldName = "PhoneNumber",
                     EInDbValue = ein?.PhoneNumber,
                     CenResDbValue = cen?.PhoneNumber,
@@ -599,9 +690,10 @@ namespace CendynDataComparisonUtility.Controllers
                 });
                 comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key.ToString(),
                     PropertyId = cen?.CendynPropertyId,
-                    ProfileId = cen.ExternalProfileID,
+                    ExternalId1 = cen.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    TableName = "Profiles",
                     FieldName = "HomePhoneNumber",
                     EInDbValue = ein?.HomePhoneNumber,
                     CenResDbValue = cen?.HomePhone,
@@ -610,9 +702,10 @@ namespace CendynDataComparisonUtility.Controllers
                 });
                 comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key.ToString(),
                     PropertyId = cen?.CendynPropertyId,
-                    ProfileId = cen.ExternalProfileID,
+                    ExternalId1 = cen.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    TableName = "Profiles",
                     FieldName = "FaxNumber",
                     EInDbValue = ein?.FaxNumber,
                     CenResDbValue = cen?.FaxNumber,
@@ -621,9 +714,10 @@ namespace CendynDataComparisonUtility.Controllers
                 });
                 comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key.ToString(),
                     PropertyId = cen?.CendynPropertyId,
-                    ProfileId = cen.ExternalProfileID,
+                    ExternalId1 = cen.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    TableName = "Profiles",
                     FieldName = "Email",
                     EInDbValue = ein?.Email,
                     CenResDbValue = cen?.Email,
@@ -632,9 +726,10 @@ namespace CendynDataComparisonUtility.Controllers
                 });
                 comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key.ToString(),
                     PropertyId = cen?.CendynPropertyId,
-                    ProfileId = cen.ExternalProfileID,
+                    ExternalId1 = cen.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    TableName = "Profiles",
                     FieldName = "Languages",
                     EInDbValue = ein?.Languages,
                     CenResDbValue = cen?.Language,
@@ -643,9 +738,10 @@ namespace CendynDataComparisonUtility.Controllers
                 });
                 comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key.ToString(),
                     PropertyId = cen?.CendynPropertyId,
-                    ProfileId = cen.ExternalProfileID,
+                    ExternalId1 = cen.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    TableName = "Profiles",
                     FieldName = "Nationality",
                     EInDbValue = ein?.Nationality,
                     CenResDbValue = cen?.Nationality,
@@ -654,9 +750,10 @@ namespace CendynDataComparisonUtility.Controllers
                 });
                 comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key.ToString(),
                     PropertyId = cen?.CendynPropertyId,
-                    ProfileId = cen.ExternalProfileID,
+                    ExternalId1 = cen.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    TableName = "Profiles",
                     FieldName = "CellPhoneNumber",
                     EInDbValue = ein?.CellPhoneNumber,
                     CenResDbValue = "No Value",
@@ -665,9 +762,10 @@ namespace CendynDataComparisonUtility.Controllers
                 });
                 comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key.ToString(),
                     PropertyId = cen?.CendynPropertyId,
-                    ProfileId = cen.ExternalProfileID,
+                    ExternalId1 = cen.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    TableName = "Profiles",
                     FieldName = "BusinessPhoneNumber",
                     EInDbValue = ein?.BusinessPhoneNumber,
                     CenResDbValue = cen?.WorkPhone,
@@ -676,9 +774,10 @@ namespace CendynDataComparisonUtility.Controllers
                 });
                 comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key.ToString(),
                     PropertyId = cen?.CendynPropertyId,
-                    ProfileId = cen.ExternalProfileID,
+                    ExternalId1 = cen.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    TableName = "Profiles",
                     FieldName = "CompanyTitle",
                     EInDbValue = ein?.CompanyTitle,
                     CenResDbValue = cen?.CompanyName,
@@ -687,9 +786,10 @@ namespace CendynDataComparisonUtility.Controllers
                 });
                 comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key.ToString(),
                     PropertyId = cen?.CendynPropertyId,
-                    ProfileId = cen.ExternalProfileID,
+                    ExternalId1 = cen.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    TableName = "Profiles",
                     FieldName = "JobTitle",
                     EInDbValue = ein?.JobTitle,
                     CenResDbValue = cen?.JobTitle,
@@ -698,9 +798,10 @@ namespace CendynDataComparisonUtility.Controllers
                 });
                 comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key.ToString(),
                     PropertyId = cen?.CendynPropertyId,
-                    ProfileId = cen.ExternalProfileID,
+                    ExternalId1 = cen.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    TableName = "Profiles",
                     FieldName = "AllowEMail",
                     EInDbValue = ein?.AllowEMail,
                     CenResDbValue = cen?.AllowEmail,
@@ -709,9 +810,10 @@ namespace CendynDataComparisonUtility.Controllers
                 });
                 comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key.ToString(),
                     PropertyId = cen?.CendynPropertyId,
-                    ProfileId = cen.ExternalProfileID,
+                    ExternalId1 = cen.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    TableName = "Profiles",
                     FieldName = "AllowMail",
                     EInDbValue = ein?.AllowMail,
                     CenResDbValue = cen?.AllowMail,
@@ -719,67 +821,9 @@ namespace CendynDataComparisonUtility.Controllers
                     CenResNormalizeDbValue = norm?.AllowMail
                 });
             }
-            var ws = wb.Worksheets.Add("Profiles");
-            ws.Cell(1, 1).Value = "Key";
-            ws.Cell(1, 2).Value = "PropertyId";
-            ws.Cell(1, 3).Value = "ProfileId";
-            ws.Cell(1, 4).Value = "Field";
-            ws.Cell(1, 5).Value = "eInDb";
-            ws.Cell(1, 6).Value = "CenResDb";
-            ws.Cell(1, 7).Value = "MongoDb";
-            ws.Cell(1, 8).Value = "CenResNormalizeDb";
-
-            for (int i = 0; i < comparisonRows.Count; i++)
-            {
-                var row = comparisonRows[i];
-                ws.Cell(i + 2, 1).Value = row.Key;
-                ws.Cell(i + 2, 2).Value = row.PropertyId;
-                ws.Cell(i + 2, 3).Value = row.ProfileId;
-                ws.Cell(i + 2, 4).Value = row.FieldName;
-                ws.Cell(i + 2, 5).Value = row?.EInDbValue ?? string.Empty;
-                ws.Cell(i + 2, 6).Value = row?.CenResDbValue ?? string.Empty;
-                ws.Cell(i + 2, 7).Value = row?.MongoDbValue ?? string.Empty;
-                ws.Cell(i + 2, 8).Value = row?.CenResNormalizeDbValue ?? string.Empty;
-            }
-            ws.Columns().AdjustToContents();
-            ws.SheetView.FreezeRows(1);
-
-
-            // Highlight mismatches
-            for (int i = 2; i <= comparisonRows.Count + 1; i++)
-            {
-                var ein = ws.Cell(i, 5).GetString();
-                var cen = ws.Cell(i, 6).GetString();
-                var mongo = ws.Cell(i, 7).GetString();
-                var normalized = ws.Cell(i, 8).GetString();
-
-                // eInDb
-                if (!string.Equals(ein, cen, StringComparison.OrdinalIgnoreCase))
-                    ws.Cell(i, 5).Style.Fill.BackgroundColor = XLColor.LightSalmon;
-                else
-                    ws.Cell(i, 5).Style.Fill.BackgroundColor = XLColor.LightGreen;
-
-                //CenRes
-                if (!string.Equals(cen, mongo, StringComparison.OrdinalIgnoreCase))
-                    ws.Cell(i, 6).Style.Fill.BackgroundColor = XLColor.LightYellow;
-                else
-                    ws.Cell(i, 6).Style.Fill.BackgroundColor = XLColor.LightGreen;
-
-
-                // MongoDb
-                if (!string.Equals(mongo, normalized, StringComparison.OrdinalIgnoreCase))
-                    ws.Cell(i, 7).Style.Fill.BackgroundColor = XLColor.LightYellow;
-                else
-                    ws.Cell(i, 7).Style.Fill.BackgroundColor = XLColor.LightGreen;
-
-                // CenResNormalizeDb
-                if (!string.Equals(mongo, normalized, StringComparison.OrdinalIgnoreCase))
-                    ws.Cell(i, 8).Style.Fill.BackgroundColor = XLColor.LightYellow;
-                else
-                    ws.Cell(i, 8).Style.Fill.BackgroundColor = XLColor.LightGreen;
-            }
+            return comparisonRows;
         }
-        private static void CreateReservationsSheet(XLWorkbook wb, int featureSet)
+        private static List<FieldComparisonRow> CreateReservationsSheet(int featureSet)
         {
             string parentCompanyId = "67371b9bd167a7000161f496";
             var (eInRepo, cenResRepo, mongoRepo, cenResNRepo) = CreateAllRepositories();
@@ -810,17 +854,7 @@ namespace CendynDataComparisonUtility.Controllers
             var cenResN_Reservations = cenResNRepo.GetReservation(parentCompanyId, puchaseIds);
 
             #endregion
-
-            var ws = wb.Worksheets.Add("Reservations");
-            ws.Cell(1, 1).Value = "Key";
-            ws.Cell(1, 2).Value = "PropertyId";
-            ws.Cell(1, 3).Value = "ReservationID";
-            ws.Cell(1, 4).Value = "Field";
-            ws.Cell(1, 5).Value = "eInDb";
-            ws.Cell(1, 6).Value = "CenResDb";
-            ws.Cell(1, 7).Value = "MongoDb";
-            ws.Cell(1, 8).Value = "CenResNormalizeDb";
-
+       
             // Collect keys from each source   // Resevation id is common in ein()
             var eInKeys = eIn_Reservations?.Select(c => c.ReservationNumber);
             var cenKeys = cenRes_Reservations?.Select(p => p.ReservationNumber);
@@ -836,7 +870,7 @@ namespace CendynDataComparisonUtility.Controllers
               .Distinct()
               .ToList();
 
-            var comparisonRows = new List<FieldComparisonRowReservations>();
+            var comparisonRows = new List<FieldComparisonRow>();
             foreach (var key in allKeys) // union of all PKs from all sources
             {
                 var ein = eIn_Reservations?.FirstOrDefault(x => x.ReservationNumber == key);
@@ -844,66 +878,78 @@ namespace CendynDataComparisonUtility.Controllers
                 var mongo = mongo_Reservations?.FirstOrDefault(x => x.UniqId_ExternalResID1 == key);
                 var norm = cenResN_Reservations?.FirstOrDefault(x => x.ReservationNumber == key);
 
-                comparisonRows.Add(new FieldComparisonRowReservations
+                comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key?.ToString(),
                     PropertyId = cen?.CendynPropertyID,
-                    ReservationId = cen.ReservationNumber,
+                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    StayDateOrTransactionDate =cen?.ArrivalDate,
+                    TableName = "Reservations",
                     FieldName = "Sub Reservation Number",
                     EInDbValue = ein?.SubReservationNumber,
                     CenResDbValue = cen?.SubReservationNumber,
                     MongoDbValue = mongo?.ConfirmationNumber,
                     CenResNormalizeDbValue = norm?.SubReservationNumber
                 });
-                comparisonRows.Add(new FieldComparisonRowReservations
+                comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key?.ToString(),
                     PropertyId = cen?.CendynPropertyID,
-                    ReservationId = cen.ReservationNumber,
+                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    StayDateOrTransactionDate = cen?.ArrivalDate,
+                    TableName = "Reservations",
                     FieldName = "CentralReservation",
                     EInDbValue = ein?.CentralReservation,
                     CenResDbValue = cen?.CentralReservation,
                     MongoDbValue = mongo?.CentralResNum,
                     CenResNormalizeDbValue = norm?.CentralReservation
                 });
-                comparisonRows.Add(new FieldComparisonRowReservations
+                comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key?.ToString(),
                     PropertyId = cen?.CendynPropertyID,
-                    ReservationId = cen.ReservationNumber,
+                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    StayDateOrTransactionDate = cen?.ArrivalDate,
+                    TableName = "Reservations",
                     FieldName = "BookingEngConfNum",
                     EInDbValue = ein?.BookingEngConfNum,
                     CenResDbValue = cen?.BookingEngConfNum,
                     MongoDbValue = mongo?.BookingSourceName,
                     CenResNormalizeDbValue = norm?.SourceOfBusiness
                 });
-                comparisonRows.Add(new FieldComparisonRowReservations
+                comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key?.ToString(),
                     PropertyId = cen?.CendynPropertyID,
-                    ReservationId = cen.ReservationNumber,
+                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    StayDateOrTransactionDate = cen?.ArrivalDate,
+                    TableName = "Reservations",
                     FieldName = "StayStatus",
                     EInDbValue = ein?.StayStatus,
                     CenResDbValue = cen?.StayStatus,
                     MongoDbValue = mongo?.ResStatusCode,
                     CenResNormalizeDbValue = norm?.StayStatus
                 });
-                comparisonRows.Add(new FieldComparisonRowReservations
+                comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key?.ToString(),
                     PropertyId = cen?.CendynPropertyID,
-                    ReservationId = cen.ReservationNumber,
+                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    StayDateOrTransactionDate = cen?.ArrivalDate,
+                    TableName = "Reservations",
                     FieldName = "ArrivalDate",
                     EInDbValue = ein?.ArrivalDate.ToString(),
                     CenResDbValue = cen?.ArrivalDate.ToString(),
                     MongoDbValue = mongo?.ResArriveDate.ToString(),
                     CenResNormalizeDbValue = norm?.ArrivalDate.ToString()
                 });
-                comparisonRows.Add(new FieldComparisonRowReservations
+                comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key?.ToString(),
                     PropertyId = cen?.CendynPropertyID,
-                    ReservationId = cen.ReservationNumber,
+                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    StayDateOrTransactionDate = cen?.ArrivalDate,
+                    TableName = "Reservations",
                     FieldName = "DepartureDate",
                     EInDbValue = ein?.DepartureDate.ToString(),
                     CenResDbValue = cen?.DepartureDate.ToString(),
@@ -911,220 +957,260 @@ namespace CendynDataComparisonUtility.Controllers
                     CenResNormalizeDbValue = norm?.DepartureDate.ToString()
                 });
 
-                comparisonRows.Add(new FieldComparisonRowReservations
+                comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key?.ToString(),
                     PropertyId = cen?.CendynPropertyID,
-                    ReservationId = cen.ReservationNumber,
+                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    StayDateOrTransactionDate = cen?.ArrivalDate,
+                    TableName = "Reservations",
                     FieldName = "BookingDate",
                     EInDbValue = ein?.BookingDate.ToString(),
                     CenResDbValue = cen?.BookingDate?.ToString(),
                     MongoDbValue = mongo?.BookingDate?.ToString(),
                     CenResNormalizeDbValue = norm?.BookingDate.ToString()
                 });
-                comparisonRows.Add(new FieldComparisonRowReservations
+                comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key?.ToString(),
                     PropertyId = cen?.CendynPropertyID,
-                    ReservationId = cen.ReservationNumber,
+                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    StayDateOrTransactionDate = cen?.ArrivalDate,
+                    TableName = "Reservations",
                     FieldName = "CancelDate",
                     EInDbValue = ein?.CancelDate.ToString(),
                     CenResDbValue = cen?.CancelDate?.ToString(),
                     MongoDbValue = mongo?.CancelDate?.ToString(),
                     CenResNormalizeDbValue = norm?.CancelDate.ToString()
                 });
-                comparisonRows.Add(new FieldComparisonRowReservations
+                comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key?.ToString(),
                     PropertyId = cen?.CendynPropertyID,
-                    ReservationId = cen?.ReservationNumber, // Use null-conditional operator
+                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    StayDateOrTransactionDate = cen?.ArrivalDate,
+                    TableName = "Reservations",
                     FieldName = "GroupReservation",
                     EInDbValue = ein?.GroupReservation?.ToString(), // Use null-conditional operator
                     CenResDbValue = cen?.GroupReservation?.ToString(), // Use null-conditional operator
                     MongoDbValue = mongo?.GroupName?.ToString(), // Use null-conditional operator
                     CenResNormalizeDbValue = norm?.GroupReservation?.ToString() // Use null-conditional operator
                 });
-                comparisonRows.Add(new FieldComparisonRowReservations
+                comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key?.ToString(),
                     PropertyId = cen?.CendynPropertyID,
-                    ReservationId = cen.ReservationNumber,
+                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    StayDateOrTransactionDate = cen?.ArrivalDate,
+                    TableName = "Reservations",
                     FieldName = "Channel",
                     EInDbValue = ein?.Channel?.ToString(),
                     CenResDbValue = cen?.Channel?.ToString(),
                     MongoDbValue = mongo?.StayChannelCode?.ToString(),
                     CenResNormalizeDbValue = norm?.Channel?.ToString()
                 });
-                comparisonRows.Add(new FieldComparisonRowReservations
+                comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key?.ToString(),
                     PropertyId = cen?.CendynPropertyID,
-                    ReservationId = cen.ReservationNumber,
+                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    StayDateOrTransactionDate = cen?.ArrivalDate,
+                    TableName = "Reservations",
                     FieldName = "SourceOfBusiness",
                     EInDbValue = ein?.SourceOfBusiness?.ToString(),
                     CenResDbValue = cen?.SourceOfBusiness?.ToString(),
                     MongoDbValue = mongo?.BookingSourceName,
                     CenResNormalizeDbValue = norm?.SourceOfBusiness?.ToString()
                 });
-                comparisonRows.Add(new FieldComparisonRowReservations
+                comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key?.ToString(),
                     PropertyId = cen?.CendynPropertyID,
-                    ReservationId = cen.ReservationNumber,
+                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    StayDateOrTransactionDate = cen?.ArrivalDate,
+                    TableName = "Reservations",
                     FieldName = "MarketSeg",
                     EInDbValue = ein?.MarketSeg?.ToString(),
                     CenResDbValue = cen?.MarketSeg?.ToString(),
                     MongoDbValue = mongo?.MarketSegmentCode,
                     CenResNormalizeDbValue = norm?.MarketSeg?.ToString()
                 });
-                comparisonRows.Add(new FieldComparisonRowReservations
+                comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key?.ToString(),
                     PropertyId = cen?.CendynPropertyID,
-                    ReservationId = cen.ReservationNumber,
+                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    StayDateOrTransactionDate = cen?.ArrivalDate,
+                    TableName = "Reservations",
                     FieldName = "MarketSubSeg",
                     EInDbValue = ein?.MarketSubSeg?.ToString(),
                     CenResDbValue = cen?.MarketSubSeg?.ToString(),
                     MongoDbValue = "",// mongo field not available
                     CenResNormalizeDbValue = norm?.MarketSubSeg?.ToString()
                 });
-                comparisonRows.Add(new FieldComparisonRowReservations
+                comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key?.ToString(),
                     PropertyId = cen?.CendynPropertyID,
-                    ReservationId = cen.ReservationNumber,
+                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    StayDateOrTransactionDate = cen?.ArrivalDate,
+                    TableName = "Reservations",
                     FieldName = "RoomNights",
                     EInDbValue = ein?.RoomNights.ToString(),
                     CenResDbValue = cen?.RoomNights.ToString(),
                     MongoDbValue = mongo?.NumOfNights.ToString(),
                     CenResNormalizeDbValue = norm?.RoomNights.ToString()
                 });
-                comparisonRows.Add(new FieldComparisonRowReservations
+                comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key?.ToString(),
                     PropertyId = cen?.CendynPropertyID,
-                    ReservationId = cen.ReservationNumber,
+                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    StayDateOrTransactionDate = cen?.ArrivalDate,
+                    TableName = "Reservations",
                     FieldName = "NumAdults",
                     EInDbValue = ein?.NumAdults.ToString(),
                     CenResDbValue = cen?.NumAdults.ToString(),
                     MongoDbValue = mongo?.NumOfAdults.ToString(),
                     CenResNormalizeDbValue = norm?.NumAdults.ToString()
                 });
-                comparisonRows.Add(new FieldComparisonRowReservations
+                comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key?.ToString(),
                     PropertyId = cen?.CendynPropertyID,
-                    ReservationId = cen.ReservationNumber,
+                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    StayDateOrTransactionDate = cen?.ArrivalDate,
+                    TableName = "Reservations",
                     FieldName = "NumChildren",
                     EInDbValue = ein?.NumChildren.ToString(),
                     CenResDbValue = cen?.NumChildren.ToString(),
                     MongoDbValue = mongo?.NumOfChildren.ToString(),
                     CenResNormalizeDbValue = norm?.NumChildren.ToString()
                 });
-                comparisonRows.Add(new FieldComparisonRowReservations
+                comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key?.ToString(),
                     PropertyId = cen?.CendynPropertyID,
-                    ReservationId = cen.ReservationNumber,
+                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    StayDateOrTransactionDate = cen?.ArrivalDate,
+                    TableName = "Reservations",
                     FieldName = "TotalPersons",
                     EInDbValue = ein?.TotalPersons.ToString(),
                     CenResDbValue = cen?.TotalPersons.ToString(),
                     MongoDbValue = mongo?.TotalPersons.ToString(),
                     CenResNormalizeDbValue = norm?.TotalPersons.ToString()
                 });
-                comparisonRows.Add(new FieldComparisonRowReservations
+                comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key?.ToString(),
                     PropertyId = cen?.CendynPropertyID,
-                    ReservationId = cen.ReservationNumber,
+                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    StayDateOrTransactionDate = cen?.ArrivalDate,
+                    TableName = "Reservations",
                     FieldName = "RateType",
                     EInDbValue = ein?.RateType?.ToString(),
                     CenResDbValue = cen?.RateType?.ToString(),
                     MongoDbValue = mongo?.RateType?.ToString(),
                     CenResNormalizeDbValue = norm?.RateType?.ToString()
                 });
-                comparisonRows.Add(new FieldComparisonRowReservations
+                comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key?.ToString(),
                     PropertyId = cen?.CendynPropertyID,
-                    ReservationId = cen.ReservationNumber,
+                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    StayDateOrTransactionDate = cen?.ArrivalDate,
+                    TableName = "Reservations",
                     FieldName = "RoomTypeCode",
                     EInDbValue = ein?.RoomTypeCode?.ToString(),
                     CenResDbValue = cen?.RoomTypeCode?.ToString(),
                     MongoDbValue = mongo?.RoomTypeCode?.ToString(),
                     CenResNormalizeDbValue = norm?.RoomTypeCode?.ToString()
                 });
-                comparisonRows.Add(new FieldComparisonRowReservations
+                comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key?.ToString(),
                     PropertyId = cen?.CendynPropertyID,
-                    ReservationId = cen.ReservationNumber,
+                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    StayDateOrTransactionDate = cen?.ArrivalDate,
+                    TableName = "Reservations",
                     FieldName = "RoomCode",
                     EInDbValue = ein?.RoomCode?.ToString(),
                     CenResDbValue = cen?.RoomCode?.ToString(),
                     MongoDbValue = mongo?.RoomCode?.ToString(),
                     CenResNormalizeDbValue = norm?.RoomCode?.ToString()
                 });
-                comparisonRows.Add(new FieldComparisonRowReservations
+                comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key?.ToString(),
                     PropertyId = cen?.CendynPropertyID,
-                    ReservationId = cen.ReservationNumber,
+                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    StayDateOrTransactionDate = cen?.ArrivalDate,
+                    TableName = "Reservations",
                     FieldName = "IATA",
                     EInDbValue = ein?.IATA?.ToString(),
                     CenResDbValue = cen?.IATA?.ToString(),
                     MongoDbValue = mongo?.TravelAgentIata?.ToString(),
                     CenResNormalizeDbValue = norm?.IATA?.ToString()
                 });
-                comparisonRows.Add(new FieldComparisonRowReservations
+                comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key?.ToString(),
                     PropertyId = cen?.CendynPropertyID,
-                    ReservationId = cen.ReservationNumber,
+                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    StayDateOrTransactionDate = cen?.ArrivalDate,
+                    TableName = "Reservations",
                     FieldName = "NumRooms",
                     EInDbValue = ein?.NumRooms.ToString(),
                     CenResDbValue = cen?.NumRooms.ToString(),
                     MongoDbValue = mongo?.NumberRooms.ToString(),
                     CenResNormalizeDbValue = norm?.NumRooms.ToString()
                 });
-                comparisonRows.Add(new FieldComparisonRowReservations
+                comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key?.ToString(),
                     PropertyId = cen?.CendynPropertyID,
-                    ReservationId = cen.ReservationNumber,
+                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    StayDateOrTransactionDate = cen?.ArrivalDate,
+                    TableName = "Reservations",
                     FieldName = "RoomRevenue",
                     EInDbValue = ein?.RoomRevenue.ToString(),
                     CenResDbValue = cen?.RoomRevenue.ToString(),
                     MongoDbValue = mongo?.RoomRevenue.ToString(),
                     CenResNormalizeDbValue = norm?.RoomRevenue.ToString()
                 });
-                comparisonRows.Add(new FieldComparisonRowReservations
+                comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key?.ToString(),
                     PropertyId = cen?.CendynPropertyID,
-                    ReservationId = cen.ReservationNumber,
+                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    StayDateOrTransactionDate = cen?.ArrivalDate,
+                    TableName = "Reservations",
                     FieldName = "Tax",
                     EInDbValue = ein?.Tax.ToString(),
                     CenResDbValue = cen?.Tax.ToString(),
                     MongoDbValue = mongo?.TotalTax.ToString(),
                     CenResNormalizeDbValue = norm?.Tax.ToString()
                 });
-                comparisonRows.Add(new FieldComparisonRowReservations
+                comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key?.ToString(),
                     PropertyId = cen?.CendynPropertyID,
-                    ReservationId = cen.ReservationNumber,
+                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    StayDateOrTransactionDate = cen?.ArrivalDate,
+                    TableName = "Reservations",
                     FieldName = "OtherRevenues",
                     EInDbValue = ein?.OtherRevenue.ToString(),
                     CenResDbValue = cen?.OtherRevenue.ToString(),
                     MongoDbValue = mongo?.TotalOtherRevenue.ToString(),
                     CenResNormalizeDbValue = norm?.OtherRevenue.ToString()
                 });
-                comparisonRows.Add(new FieldComparisonRowReservations
+                comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key?.ToString(),
                     PropertyId = cen?.CendynPropertyID,
-                    ReservationId = cen.ReservationNumber,
+                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    StayDateOrTransactionDate = cen?.ArrivalDate,
+                    TableName = "Reservations",
                     FieldName = "TotalRevenue",
                     EInDbValue = ein?.TotalRevenue.ToString(),
                     CenResDbValue = cen?.TotalRevenue.ToString(),
@@ -1133,22 +1219,9 @@ namespace CendynDataComparisonUtility.Controllers
                 });
             }
 
-            for (int i = 0; i < comparisonRows.Count; i++)
-            {
-                var row = comparisonRows[i];
-                ws.Cell(i + 2, 1).Value = row.Key;
-                ws.Cell(i + 2, 2).Value = row.PropertyId;
-                ws.Cell(i + 2, 3).Value = row.ReservationId;
-                ws.Cell(i + 2, 4).Value = row.FieldName;
-                ws.Cell(i + 2, 5).Value = row?.EInDbValue ?? string.Empty;
-                ws.Cell(i + 2, 6).Value = row?.CenResDbValue ?? string.Empty;
-                ws.Cell(i + 2, 7).Value = row?.CenResDbValue ?? string.Empty;
-                ws.Cell(i + 2, 8).Value = row?.CenResNormalizeDbValue ?? string.Empty;
-            }
-            ws.Columns().AdjustToContents();
-            ws.SheetView.FreezeRows(1);
+            return comparisonRows;
         }
-        private static void CreateStayDetailsSheet(XLWorkbook wb, int featureSet)
+        private static List<FieldComparisonRow> CreateStayDetailsSheet(int featureSet)
         {
             string parentCompanyId = "67371b9bd167a7000161f496";
             var (eInRepo, cenResRepo, mongoRepo, cenResNRepo) = CreateAllRepositories();
@@ -1186,18 +1259,7 @@ namespace CendynDataComparisonUtility.Controllers
                     .FirstOrDefault(y => y.ReservationNo == cenResNStayDetail.ReservationNumber)?.CendynPropertyId;
             }
 
-            #endregion
-
-            var ws = wb.Worksheets.Add("StayDetails");
-            ws.Cell(1, 1).Value = "Key";
-            ws.Cell(1, 2).Value = "PropertyId";
-            ws.Cell(1, 3).Value = "ReservationId";
-            ws.Cell(1, 4).Value = "Stay Date";
-            ws.Cell(1, 5).Value = "Field";
-            ws.Cell(1, 6).Value = "eInDb";
-            ws.Cell(1, 7).Value = "CenResDb";
-            ws.Cell(1, 8).Value = "MongoDb";
-            ws.Cell(1, 9).Value = "CenResNormalizeDb";
+            #endregion 
 
             // Collect keys from each source   // Resevation id is common in ein()
             var eInKeys = eIn_StayDetails?.Select(c => c.ReservationNumber);
@@ -1214,7 +1276,7 @@ namespace CendynDataComparisonUtility.Controllers
               .Distinct()
               .ToList();
 
-            var comparisonRows = new List<FieldComparisonRowStayDetail>();
+            var comparisonRows = new List<FieldComparisonRow>();
             foreach (var key in allKeys)
             {
                 var ein = eIn_StayDetails?.FirstOrDefault(x => x.ReservationNumber == key);
@@ -1222,25 +1284,27 @@ namespace CendynDataComparisonUtility.Controllers
                 var mongo = mongo_StayDetails?.FirstOrDefault(x => x.UniqId_ExternalResID1 == key);
                 var norm = cenResN_StayDetails?.FirstOrDefault(x => x.ReservationNumber == key);
 
-                comparisonRows.Add(new FieldComparisonRowStayDetail
+                comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key.ToString(),
                     PropertyId = cen?.CendynPropertyId,
-                    ReservationId = cen.ReservationNumber,
-                    StayDate = ein?.StayDate.ToString(),
+                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId2OrTransactionId = "", //check this field
+                    StayDateOrTransactionDate = cen?.StayDate,
+                    TableName = "StayDetails",
                     FieldName = "StayDate",
-                    EInDbValue = ein?.StayDate.ToString(),
-                    CenResDbValue = cen?.StayDate.ToString(),
-                    MongoDbValue = mongo?.StayDate.ToString(),
-                    CenResNormalizeDbValue = norm?.StayDate.ToString()
+                    EInDbValue = ein?.StayDate,
+                    CenResDbValue = cen?.StayDate,
+                    MongoDbValue = mongo?.StayDate,
+                    CenResNormalizeDbValue = norm?.StayDate
                 });
 
-                comparisonRows.Add(new FieldComparisonRowStayDetail
+                comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key.ToString(),
                     PropertyId = cen?.CendynPropertyId,
-                    ReservationId = cen.ReservationNumber,
-                    StayDate = ein?.StayDate.ToString(),
+                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId2OrTransactionId = "", //check this field
+                    StayDateOrTransactionDate = cen?.StayDate,
+                    TableName = "StayDetails",
                     FieldName = "StayRateType",
                     EInDbValue = ein?.StayRateType,
                     CenResDbValue = cen?.StayRateType,
@@ -1248,73 +1312,62 @@ namespace CendynDataComparisonUtility.Controllers
                     CenResNormalizeDbValue = norm?.StayRateType
                 });
 
-                comparisonRows.Add(new FieldComparisonRowStayDetail
+                comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key.ToString(),
                     PropertyId = cen?.CendynPropertyId,
-                    ReservationId = cen.ReservationNumber,
-                    StayDate = ein?.StayDate.ToString(),
+                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId2OrTransactionId = "", //check this field
+                    StayDateOrTransactionDate = cen?.StayDate,
+                    TableName = "StayDetails",
                     FieldName = "StayRoomType",
                     EInDbValue = ein?.StayRoomType,
                     CenResDbValue = cen?.StayRoomType,
                     MongoDbValue = mongo?.RoomType,
                     CenResNormalizeDbValue = norm?.StayRoomType
                 });
-                comparisonRows.Add(new FieldComparisonRowStayDetail
-                {
-                    Key = key.ToString(),
+                comparisonRows.Add(new FieldComparisonRow
+                { 
                     PropertyId = cen?.CendynPropertyId,
-                    ReservationId = cen.ReservationNumber,
-                    StayDate = ein?.StayDate.ToString(),
+                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId2OrTransactionId = "", //check this field
+                    StayDateOrTransactionDate = cen?.StayDate,
+                    TableName = "StayDetails",
                     FieldName = "StayRateAmount",
-                    EInDbValue = ein?.StayRateAmount.ToString(),
-                    CenResDbValue = cen?.StayRateAmount.ToString(),
-                    MongoDbValue = mongo?.StayRateAmount.ToString(),
-                    CenResNormalizeDbValue = norm?.StayRateAmount.ToString()
+                    EInDbValue = ein?.StayRateAmount,
+                    CenResDbValue = cen?.StayRateAmount,
+                    MongoDbValue = mongo?.StayRateAmount,
+                    CenResNormalizeDbValue = norm?.StayRateAmount
                 });
-                comparisonRows.Add(new FieldComparisonRowStayDetail
-                {
-                    Key = key.ToString(),
+                comparisonRows.Add(new FieldComparisonRow
+                { 
                     PropertyId = cen?.CendynPropertyId,
-                    ReservationId = cen.ReservationNumber,
-                    StayDate = ein?.StayDate.ToString(),
+                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId2OrTransactionId = "", //check this field
+                    StayDateOrTransactionDate = cen?.StayDate,
+                    TableName = "StayDetails",
                     FieldName = "StayNumRooms",
-                    EInDbValue = ein?.StayNumRooms.ToString(),
-                    CenResDbValue = cen?.NumberOfRooms.ToString(),
-                    MongoDbValue = mongo?.NumberOfRooms.ToString(),
-                    CenResNormalizeDbValue = norm?.StayNumRooms.ToString()
+                    EInDbValue = ein?.StayNumRooms,
+                    CenResDbValue = cen?.NumberOfRooms,
+                    MongoDbValue = mongo?.NumberOfRooms,
+                    CenResNormalizeDbValue = norm?.StayNumRooms
                 });
-                comparisonRows.Add(new FieldComparisonRowStayDetail
+                comparisonRows.Add(new FieldComparisonRow
                 {
-                    Key = key.ToString(),
                     PropertyId = cen?.CendynPropertyId,
-                    ReservationId = cen.ReservationNumber,
-                    StayDate = ein?.StayDate.ToString(),
+                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId2OrTransactionId = "", //check this field
+                    StayDateOrTransactionDate = cen?.StayDate,
+                    TableName = "StayDetails",
                     FieldName = "CurrencyCode",
-                    EInDbValue = ein?.CurrencyCode.ToString(),
-                    CenResDbValue = cen?.CurrencyCode.ToString(),
-                    MongoDbValue = mongo?.CurrencyCode.ToString(),
-                    CenResNormalizeDbValue = norm?.CurrencyCode.ToString()
+                    EInDbValue = ein?.CurrencyCode,
+                    CenResDbValue = cen?.CurrencyCode,
+                    MongoDbValue = mongo?.CurrencyCode,
+                    CenResNormalizeDbValue = norm?.CurrencyCode
                 });
             }
-
-            for (int i = 0; i < comparisonRows.Count; i++)
-            {
-                var row = comparisonRows[i];
-                ws.Cell(i + 2, 1).Value = row.Key;
-                ws.Cell(i + 2, 2).Value = row.PropertyId;
-                ws.Cell(i + 2, 3).Value = row.ReservationId;
-                ws.Cell(i + 2, 4).Value = row.StayDate;
-                ws.Cell(i + 2, 5).Value = row.FieldName;
-                ws.Cell(i + 2, 6).Value = row?.EInDbValue ?? string.Empty;
-                ws.Cell(i + 2, 7).Value = row?.CenResDbValue ?? string.Empty;
-                ws.Cell(i + 2, 8).Value = row?.MongoDbValue ?? string.Empty;
-                ws.Cell(i + 2, 9).Value = row?.CenResNormalizeDbValue ?? string.Empty;
-            }
-            ws.Columns().AdjustToContents();
-            ws.SheetView.FreezeRows(1);
+            return comparisonRows; 
         }
-        private static void CreateTransactionsSheet(XLWorkbook wb, int featureSet)
+        private static List<FieldComparisonRow> CreateTransactionsSheet(int featureSet)
         {
             string parentCompanyId = "67371b9bd167a7000161f496";
             var (eInRepo, cenResRepo, mongoRepo, cenResNRepo) = CreateAllRepositories();
@@ -1356,18 +1409,7 @@ namespace CendynDataComparisonUtility.Controllers
 
             var mongo_TransactionIds = mongo_Transactions.Select(t => new MongoTransactionMapForCenResNDb { Mongo_TransactionId = t.Id, Pk_transactions = t.Pk_Transactions }).ToList();
             var cenResN_Transactions = cenResNRepo.GetTransactions(parentCompanyId, mongo_TransactionIds);
-            #endregion
-
-            var ws = wb.Worksheets.Add("Transactions");
-            ws.Cell(1, 1).Value = "PropertyId";
-            ws.Cell(1, 2).Value = "ReservationId";
-            ws.Cell(1, 3).Value = "TransactionId";
-            ws.Cell(1, 4).Value = "TransactionDate";
-            ws.Cell(1, 5).Value = "Field";
-            ws.Cell(1, 6).Value = "eInDb";
-            ws.Cell(1, 7).Value = "CenResDb";
-            ws.Cell(1, 8).Value = "MongoDb";
-            ws.Cell(1, 9).Value = "CenResNormalizeDb";
+            #endregion 
 
             // Collect keys from each source
             var eInKeys = eIn_Transaction?.Select(p => p.PK_Transactions.ToString());
@@ -1384,7 +1426,7 @@ namespace CendynDataComparisonUtility.Controllers
                 .Distinct()
                 .ToList();
 
-            var comparisonRows = new List<FieldComparisonRowTransaction>();
+            var comparisonRows = new List<FieldComparisonRow>();
             foreach (var key in allKeys) // union of all PKs from all sources
             {
                 var ein = eIn_Transaction?.FirstOrDefault(x => x.PK_Transactions == new Guid(key));
@@ -1392,84 +1434,91 @@ namespace CendynDataComparisonUtility.Controllers
                 var mongo = mongo_Transactions?.FirstOrDefault(x => x.Pk_Transactions == new Guid(key));
                 var norm = cenResN_Transactions?.FirstOrDefault(x => x.Pk_Transactions == new Guid(key));
 
-                comparisonRows.Add(new FieldComparisonRowTransaction
+                comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyId,
-                    ReservationId = cen?.ExternalResID1,
-                    TransactionId = cen?.TransactionId,
-                    TransactionDate = cen?.TransactionDate.ToString(),
+                    ExternalId1 = cen?.ExternalResID1,
+                    ExternalId2OrTransactionId = cen?.TransactionId,
+                    StayDateOrTransactionDate = cen?.TransactionDate,
+                    TableName = "Transactions",
                     FieldName = "TransactionSource",
                     EInDbValue = ein?.TransactionSource,
                     CenResDbValue = cen?.TransactionSource,
                     MongoDbValue = mongo?.TransactionSource,
                     CenResNormalizeDbValue = norm?.TransactionSource
                 });
-                comparisonRows.Add(new FieldComparisonRowTransaction
+                comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyId,
-                    ReservationId = cen?.ExternalResID1,
-                    TransactionId = cen?.TransactionId,
-                    TransactionDate = cen?.TransactionDate.ToString(),
+                    ExternalId1 = cen?.ExternalResID1,
+                    ExternalId2OrTransactionId = cen?.TransactionId,
+                    StayDateOrTransactionDate = cen?.TransactionDate,
+                    TableName = "Transactions",
                     FieldName = "TransactionGroup",
                     EInDbValue = ein?.TransactionGroup,
                     CenResDbValue = cen?.TransactionGroup,
                     MongoDbValue = "NoValue",
                     CenResNormalizeDbValue = norm?.TransactionGroup
                 });
-                comparisonRows.Add(new FieldComparisonRowTransaction
+                comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyId,
-                    ReservationId = cen?.ExternalResID1,
-                    TransactionId = cen?.TransactionId,
-                    TransactionDate = cen?.TransactionDate.ToString(),
+                    ExternalId1 = cen?.ExternalResID1,
+                    ExternalId2OrTransactionId = cen?.TransactionId,
+                    StayDateOrTransactionDate = cen?.TransactionDate,
+                    TableName = "Transactions",
                     FieldName = "TransactionDate",
                     EInDbValue = ein?.TransactionDate.ToString(),
                     CenResDbValue = cen?.TransactionDate.ToString(),
                     MongoDbValue = mongo?.TransactionDate.ToString(),
                     CenResNormalizeDbValue = norm?.TransactionDate.ToString()
                 });
-                comparisonRows.Add(new FieldComparisonRowTransaction
+                comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyId,
-                    ReservationId = cen?.ExternalResID1,
-                    TransactionId = cen?.TransactionId,
-                    TransactionDate = cen?.TransactionDate.ToString(),
+                    ExternalId1 = cen?.ExternalResID1,
+                    ExternalId2OrTransactionId = cen?.TransactionId,
+                    StayDateOrTransactionDate = cen?.TransactionDate,
+                    TableName = "Transactions",
                     FieldName = "TransactionCode",
                     EInDbValue = ein?.TransactionCode,
                     CenResDbValue = cen?.TransactionCode,
                     MongoDbValue = mongo?.TransactionCode,
                     CenResNormalizeDbValue = norm?.TransactionCode
                 });
-                comparisonRows.Add(new FieldComparisonRowTransaction
+                comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyId,
-                    ReservationId = cen?.ExternalResID1,
-                    TransactionId = cen?.TransactionId,
-                    TransactionDate = cen?.TransactionDate.ToString(),
+                    ExternalId1 = cen?.ExternalResID1,
+                    ExternalId2OrTransactionId = cen?.TransactionId,
+                    StayDateOrTransactionDate = cen?.TransactionDate,
+                    TableName = "Transactions",
                     FieldName = "CurrencyCode",
                     EInDbValue = ein?.CurrencyCode,
                     CenResDbValue = cen?.CurrencyCode,
                     MongoDbValue = mongo?.CurrencyCode,
                     CenResNormalizeDbValue = norm?.CurrencyCode
                 });
-                comparisonRows.Add(new FieldComparisonRowTransaction
+                comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyId,
-                    ReservationId = cen?.ExternalResID1,
-                    TransactionId = cen?.TransactionId,
-                    TransactionDate = cen?.TransactionDate.ToString(),
+                    ExternalId1 = cen?.ExternalResID1,
+                    ExternalId2OrTransactionId = cen?.TransactionId,
+                    StayDateOrTransactionDate = cen?.TransactionDate,
+                    TableName = "Transactions",
                     FieldName = "CreditAmount",
                     EInDbValue = ein?.CreditAmount,
                     CenResDbValue = cen?.CreditAmount,
                     MongoDbValue = mongo?.CreditAmount,
                     CenResNormalizeDbValue = norm?.CreditAmount
                 });
-                comparisonRows.Add(new FieldComparisonRowTransaction
+                comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyId,
-                    ReservationId = cen?.ExternalResID1,
-                    TransactionId = cen?.TransactionId,
-                    TransactionDate = cen?.TransactionDate.ToString(),
+                    ExternalId1 = cen?.ExternalResID1,
+                    ExternalId2OrTransactionId = cen?.TransactionId,
+                    StayDateOrTransactionDate = cen?.TransactionDate,
+                    TableName = "Transactions",
                     FieldName = "DebitAmount",
                     EInDbValue = ein?.DebitAmount,
                     CenResDbValue = cen?.DebitAmount,
@@ -1478,33 +1527,13 @@ namespace CendynDataComparisonUtility.Controllers
                 });
 
             }
-            for (int i = 0; i < comparisonRows.Count; i++)
-            {
-                var row = comparisonRows[i];
-                ws.Cell(i + 2, 1).Value = row.PropertyId;
-                ws.Cell(i + 2, 2).Value = row.ReservationId;
-                ws.Cell(i + 2, 3).Value = row.TransactionId;
-                ws.Cell(i + 2, 4).Value = row.TransactionDate;
-                ws.Cell(i + 2, 5).Value = row.FieldName;
-                ws.Cell(i + 2, 6).Value = row?.EInDbValue ?? string.Empty;
-                ws.Cell(i + 2, 7).Value = row?.CenResDbValue ?? string.Empty;
-                ws.Cell(i + 2, 8).Value = row?.MongoDbValue ?? string.Empty;
-                ws.Cell(i + 2, 9).Value = row?.CenResNormalizeDbValue ?? string.Empty;
-            }
-            ws.Columns().AdjustToContents();
-            ws.SheetView.FreezeRows(1);
+            return comparisonRows; 
         }
 
         private static string BuildMongoUserId(CenResProfiles profile)
         {
             return $"{profile.ExternalProfileID}-{profile.CendynPropertyId}-{(string.IsNullOrEmpty(profile.ExternalProfileID2) ? "pms" : profile.ExternalProfileID2)}";
         }
-
-        private static string BuildTransactionCode(CenResReservations reservation)
-        {
-            return $"{reservation.ExternalResID1}-{reservation.CendynPropertyID}-{(string.IsNullOrEmpty(reservation.ExternalResID2) ? "PMS" : reservation.ExternalResID2)}";
-        }
-
         private string FormatConnectionString(AvailableConnectionInformation conn)
         {
             return $"Server={conn.ServerName};Database={conn.DatabaseName};User Id={conn.DatabaseUser};Password={conn.DatabasePassword};TrustServerCertificate=True;";
@@ -1528,49 +1557,16 @@ namespace CendynDataComparisonUtility.Controllers
         }
         public class FieldComparisonRow
         {
-            public string Key { get; set; }
             public string PropertyId { get; set; }
-            public string ProfileId { get; set; }
+            public string ExternalId1 { get; set; }
+            public string ExternalId2OrTransactionId { get; set; }
+            public DateTime? StayDateOrTransactionDate { get; set; }
+            public string TableName { get; set; }
             public string FieldName { get; set; }
-            public dynamic? EInDbValue { get; set; }
-            public dynamic? CenResDbValue { get; set; }
-            public dynamic? MongoDbValue { get; set; }
-            public dynamic? CenResNormalizeDbValue { get; set; }
-        }
-        public class FieldComparisonRowReservations
-        {
-            public string Key { get; set; }
-            public string PropertyId { get; set; }
-            public string ReservationId { get; set; }
-            public string FieldName { get; set; }
-            public dynamic? EInDbValue { get; set; }
-            public dynamic? CenResDbValue { get; set; }
-            public dynamic? MongoDbValue { get; set; }
-            public dynamic? CenResNormalizeDbValue { get; set; }
-        }
-        public class FieldComparisonRowStayDetail
-        {
-            public string Key { get; set; }
-            public string PropertyId { get; set; }
-            public string ReservationId { get; set; }
-            public string StayDate { get; set; }
-            public string FieldName { get; set; }
-            public dynamic? EInDbValue { get; set; }
-            public dynamic? CenResDbValue { get; set; }
-            public dynamic? MongoDbValue { get; set; }
-            public dynamic? CenResNormalizeDbValue { get; set; }
-        }
-        public class FieldComparisonRowTransaction
-        {
-            public string PropertyId { get; set; }
-            public string ReservationId { get; set; }
-            public string TransactionId { get; set; }
-            public string TransactionDate { get; set; }
-            public string FieldName { get; set; }
-            public dynamic? EInDbValue { get; set; }
-            public dynamic? CenResDbValue { get; set; }
-            public dynamic? MongoDbValue { get; set; }
-            public dynamic? CenResNormalizeDbValue { get; set; }
+            public dynamic EInDbValue { get; set; }
+            public dynamic CenResDbValue { get; set; }
+            public dynamic MongoDbValue { get; set; }
+            public dynamic CenResNormalizeDbValue { get; set; }
         }
     }
 }

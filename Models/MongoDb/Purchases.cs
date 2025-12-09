@@ -134,7 +134,7 @@ namespace CendynDataComparisonUtility.Models.MongoDb
         public string CurrencyCode { get; set; } = default!;
 
         [BsonElement("stay_detail_room_number")]
-        public int? NumberOfRooms { get; set; } = default!;
+        public string NumberOfRooms { get; set; } = default!;
 
         public string UniqId_ExternalResID1 { get; set; } = default!;   
 

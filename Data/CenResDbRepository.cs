@@ -74,7 +74,7 @@ namespace CendynDataComparisonUtility.Service
         {
             var queryBuilder = new StringBuilder(QueryDefinitions.CenResDb.Reservations);
             if (feature == 1 && pk_reservationIds != null && pk_reservationIds.Count > 0)
-                queryBuilder.Append(" WHERE R.PK_Reservations IN @Ids"); //query += $" WHERE R.PK_Reservations IN ({string.Join(",", pk_reservationIds.Select(id => $"'{id}'"))})";
+                queryBuilder.Append(" WHERE R.PK_Reservations IN @Ids");
             else if (feature == 2)
                 queryBuilder.Append(" ORDER BY R.DateResMade DESC OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY");
 
@@ -86,11 +86,11 @@ namespace CendynDataComparisonUtility.Service
         }
 
         //Get Stay Details
-        public IEnumerable<CenResStayDetail> GetStayDetails(List<Guid>? pk_stayDetailIds = null, int feature = 1)
+        public IEnumerable<CenResStayDetail> GetStayDetails(List<Guid> pk_stayDetailIds = null, int feature = 1)
         {
             var queryBuilder = new StringBuilder(QueryDefinitions.CenResDb.StayDetail);
             if (feature == 1 && pk_stayDetailIds != null && pk_stayDetailIds.Count > 0)
-                queryBuilder.Append(" WHERE SD.PK_StayDetail IN @Ids"); //query += $" WHERE SD.PK_StayDetail IN ({string.Join(",", pk_stayDetailIds.Select(id => $"'{id}'"))})";
+                queryBuilder.Append(" WHERE SD.PK_StayDetail IN @Ids"); 
             else if (feature == 2)
                 queryBuilder.Append(" ORDER BY SD.DateInserted DESC OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY");
 
@@ -101,7 +101,7 @@ namespace CendynDataComparisonUtility.Service
                 return connection.Query<CenResStayDetail>(queryBuilder.ToString());
         }
 
-        public IEnumerable<CenResTransactions> GetTransactions(List<Guid>? pk_transactionIds = null, int feature = 1)
+        public IEnumerable<CenResTransactions> GetTransactions(List<Guid> pk_transactionIds = null, int feature = 1)
         {
             var queryBuilder = new StringBuilder(QueryDefinitions.CenResDb.Transactions);
             if (feature == 1 && pk_transactionIds != null && pk_transactionIds.Count > 0)
