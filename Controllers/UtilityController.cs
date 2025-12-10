@@ -6,14 +6,12 @@ using CendynDataComparisonUtility.Models.Dtos;
 using CendynDataComparisonUtility.Service;
 using ClosedXML.Excel;
 using Dapper;
-using Humanizer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using MongoDB.Driver;
 using Newtonsoft.Json;
 using static CendynDataComparisonUtility.Data.MongoDbRepository;
 using static CendynDataComparisonUtility.Service.CenResNormalizeDbRepository;
-using static CendynDataComparisonUtility.Utility.QueryDefinitions;
 
 namespace CendynDataComparisonUtility.Controllers
 {
@@ -413,9 +411,8 @@ namespace CendynDataComparisonUtility.Controllers
         }
 
         private List<FieldComparisonRow> CreateProfilesSheet(int featureSet)
-        {
-            string parentCompanyId = "67371b9bd167a7000161f496";
-            var (eInRepo, cenResRepo, mongoRepo, cenResNRepo) = CreateAllRepositories();
+        { 
+            var (eInRepo, cenResRepo, mongoRepo, mongoParentCompanyId, cenResNRepo) = CreateAllRepositories();
 
             #region Profiles Comparison
             IEnumerable<Customer> eIn_Customer = null;
@@ -438,10 +435,10 @@ namespace CendynDataComparisonUtility.Controllers
                     break;
             }
             List<MongoCenResMap> userIds = [.. cenRes_Profiles.Select(p => new MongoCenResMap { UserIds = BuildMongoUserId(p), Pk_Profiles = p.PK_Profiles })];
-            var mongoProfiles = mongoRepo.GetContacts(userIds, parentCompanyId);
+            var mongoProfiles = mongoRepo.GetContacts(userIds, mongoParentCompanyId);
 
             var mongoCustomerIds = mongoProfiles.Select(m => m.Id).ToList();
-            var cenResNCustomers = cenResNRepo.GetCustomers(parentCompanyId, mongoCustomerIds);
+            var cenResNCustomers = cenResNRepo.GetCustomers(mongoParentCompanyId, mongoCustomerIds);
             //Add Static Pk_profiles for reference to cenResNCustomers
             foreach (var normCust in cenResNCustomers)
             {
@@ -717,9 +714,8 @@ namespace CendynDataComparisonUtility.Controllers
             return comparisonRows;
         }
         private List<FieldComparisonRow> CreateReservationsSheet(int featureSet)
-        {
-            string parentCompanyId = "67371b9bd167a7000161f496";
-            var (eInRepo, cenResRepo, mongoRepo, cenResNRepo) = CreateAllRepositories();
+        { 
+            var (eInRepo, cenResRepo, mongoRepo, mongoParentCompanyId, cenResNRepo) = CreateAllRepositories();
 
             #region Reservations Comparison
             IEnumerable<CustomerStay> eIn_Reservations = null;
@@ -741,10 +737,10 @@ namespace CendynDataComparisonUtility.Controllers
                     break;
             }
             var cenResIds = cenRes_Reservations.Select(r => new MongoResMap { ReservationNo = r.ReservationNumber, CendynPropertyId = r.CendynPropertyID }).ToList();
-            var mongo_Reservations = mongoRepo.Purchases(cenResIds, parentCompanyId);
+            var mongo_Reservations = mongoRepo.Purchases(cenResIds, mongoParentCompanyId);
 
             var puchaseIds = mongo_Reservations.Select(r => r.Id).ToList();
-            var cenResN_Reservations = cenResNRepo.GetReservation(parentCompanyId, puchaseIds);
+            var cenResN_Reservations = cenResNRepo.GetReservation(mongoParentCompanyId, puchaseIds);
 
             #endregion
 
@@ -1115,9 +1111,8 @@ namespace CendynDataComparisonUtility.Controllers
             return comparisonRows;
         }
         private List<FieldComparisonRow> CreateStayDetailsSheet(int featureSet)
-        {
-            string parentCompanyId = "67371b9bd167a7000161f496";
-            var (eInRepo, cenResRepo, mongoRepo, cenResNRepo) = CreateAllRepositories();
+        { 
+            var (eInRepo, cenResRepo, mongoRepo, mongoParentCompanyId, cenResNRepo) = CreateAllRepositories();
 
             #region StayDetail Comparison 
             IEnumerable<CustomerStayDetail> eIn_StayDetails = null;
@@ -1139,10 +1134,10 @@ namespace CendynDataComparisonUtility.Controllers
                     break;
             }
             var cenResIds = cenRes_StayDetails.Select(r => new MongoResMap { ReservationNo = r.ReservationNumber, CendynPropertyId = r.CendynPropertyId }).ToList();
-            var mongo_StayDetails = mongoRepo.StayDetails(cenResIds, parentCompanyId);
+            var mongo_StayDetails = mongoRepo.StayDetails(cenResIds, mongoParentCompanyId);
 
             var mongo_StayIds = mongo_StayDetails.Select(s => s.Id).ToList();
-            var cenResN_StayDetails = cenResNRepo.GetStayDetails(parentCompanyId, mongo_StayIds);
+            var cenResN_StayDetails = cenResNRepo.GetStayDetails(mongoParentCompanyId, mongo_StayIds);
             var mongoRes_PropertyMap = mongo_StayDetails.Select(m => new MongoResMap { ReservationNo = m.UniqId_ExternalResID1, CendynPropertyId = m.Uuid_CendynPropertyID }).ToList();
 
             foreach (var cenResNStayDetail in cenResN_StayDetails)
@@ -1262,8 +1257,7 @@ namespace CendynDataComparisonUtility.Controllers
         }
         private List<FieldComparisonRow> CreateTransactionsSheet(int featureSet)
         {
-            string parentCompanyId = "67371b9bd167a7000161f496";
-            var (eInRepo, cenResRepo, mongoRepo, cenResNRepo) = CreateAllRepositories();
+            var (eInRepo, cenResRepo, mongoRepo, mongoParentCompanyId, cenResNRepo) = CreateAllRepositories();
             #region Transactions Comparison 
             IEnumerable<CustomerTransactions> eIn_Transaction = null;
             IEnumerable<CenResTransactions> cenRes_Transactions = null;
@@ -1293,7 +1287,7 @@ namespace CendynDataComparisonUtility.Controllers
                 TransactionId = r.TransactionId
             }).ToList();
 
-            var mongo_Transactions = mongoRepo.Transactions(mongoTransMap, parentCompanyId);
+            var mongo_Transactions = mongoRepo.Transactions(mongoTransMap, mongoParentCompanyId);
             foreach (var mongoTransaction in mongo_Transactions)
             {
                 mongoTransaction.Pk_Transactions = mongoTransMap
@@ -1301,7 +1295,7 @@ namespace CendynDataComparisonUtility.Controllers
             }
 
             var mongo_TransactionIds = mongo_Transactions.Select(t => new MongoTransactionMapForCenResNDb { Mongo_TransactionId = t.Id, Pk_transactions = t.Pk_Transactions }).ToList();
-            var cenResN_Transactions = cenResNRepo.GetTransactions(parentCompanyId, mongo_TransactionIds);
+            var cenResN_Transactions = cenResNRepo.GetTransactions(mongoParentCompanyId, mongo_TransactionIds);
             #endregion 
 
             // Collect keys from each source
@@ -1437,7 +1431,7 @@ namespace CendynDataComparisonUtility.Controllers
         }
 
 
-        private (EInDbRepository eInRepo, CenResDbRepository cenResRepo, MongoDbRepository mongoRepo, CenResNormalizeDbRepository cenResNRepo)
+        private (EInDbRepository eInRepo, CenResDbRepository cenResRepo, MongoDbRepository mongoRepo,string mongoParentCompanyId, CenResNormalizeDbRepository cenResNRepo)
         CreateAllRepositories()
         {
             //Get Connection Details from Session
@@ -1446,7 +1440,7 @@ namespace CendynDataComparisonUtility.Controllers
             var cenResRepo = new CenResDbRepository(cenRes_ConnectionString);
             var mongoRepo = new MongoDbRepository(mongo_ConnectionString, mongoDbName, mongoParentCompanyId);
             var cenResNRepo = new CenResNormalizeDbRepository(cenResN_ConnectionString);
-            return (repo, cenResRepo, mongoRepo, cenResNRepo);
+            return (repo, cenResRepo, mongoRepo, mongoParentCompanyId, cenResNRepo);
         }
         public class FieldComparisonRow
         {
