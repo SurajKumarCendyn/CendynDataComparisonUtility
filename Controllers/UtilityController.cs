@@ -6,38 +6,43 @@ using CendynDataComparisonUtility.Models.Dtos;
 using CendynDataComparisonUtility.Service;
 using ClosedXML.Excel;
 using Dapper;
+using Humanizer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using MongoDB.Driver;
 using Newtonsoft.Json;
 using static CendynDataComparisonUtility.Data.MongoDbRepository;
 using static CendynDataComparisonUtility.Service.CenResNormalizeDbRepository;
+using static CendynDataComparisonUtility.Utility.QueryDefinitions;
 
 namespace CendynDataComparisonUtility.Controllers
 {
-
     public class UtilityController : Controller
     {
         private readonly IConfiguration _config;
-        public List<DatabaseInfo> Databases { get; set; } = new();
         readonly string[] dbsList = ["eInAppDb", "CenResDb", "MongoDb", "CenResNormalizeDb"];
+        public List<ConnectionInfo> eInConnection;
         public UtilityController(IConfiguration config)
         {
             _config = config;
         }
+
+        public class ConnectionInfo()
+        {
+            public string ParentCompanyId { get; set; }
+            public string ParentCompanyName { get; set; }
+        }
         public IActionResult Index(string searchString)
         {
             List<AvailableConnectionInformation> avlConnection = new();
-
+            // If searchString is provided, update avlConnection and session
             if (!string.IsNullOrEmpty(searchString))
             {
-                // Search the company in all environments for both DBs
                 foreach (var db in dbsList)
                 {
                     var section = _config.GetSection(db);
                     foreach (var env in section.GetChildren())
                     {
-                        //Select Data from mongodb 
                         if (db == "MongoDb")
                         {
                             var mongoDbconnStr = env.GetValue<string>("ConnectionString");
@@ -70,133 +75,151 @@ namespace CendynDataComparisonUtility.Controllers
                             }
                             continue;
                         }
-
-                        var connStr = env.GetValue<string>("ConnectionString");
-                        var connstrBuilder = new SqlConnectionStringBuilder(connStr);
-                        if (string.IsNullOrEmpty(connStr)) continue;
-                        string query = db switch
+                        if (db == "eInAppDb")
                         {
-                            "eInAppDb" => "SELECT Id AS ParentCompanyId, ParentCompany AS ParentCompanyName FROM [dbo].[CendynAdmin_ParentCompany] WITH(NOLOCK) WHERE ParentCompany LIKE @search",  //AppDb einsight
-                            "CenResDb" => string.Empty,   //CenResDb Cendyn Manager
-                            "CenResNormalizeDb" => "SELECT ParentCompanyId, ParentCompanyName FROM [CCRM].[ParentCompany] WITH(NOLOCK) WHERE ParentCompanyName LIKE @search", //CenResNormalizeDb Cendyn Normalize
-                            _ => string.Empty
-                        };
+                            var connStr = env.GetValue<string>("ConnectionString");
+                            if (string.IsNullOrEmpty(connStr)) continue;
 
-                        if (string.IsNullOrEmpty(query)) continue;
+                            using var connection = new SqlConnection(connStr);
+                            if (eInConnection == null)
+                            {
+                                connection.Open();
+                                eInConnection = connection.Query<ConnectionInfo>(
+                                    "SELECT Id AS ParentCompanyId, ParentCompany AS ParentCompanyName FROM [dbo].[CendynAdmin_ParentCompany] WITH(NOLOCK) WHERE ParentCompany LIKE @search",
+                                    new { search = $"%{searchString}%" }
+                                ).ToList();
+                            }
+                            foreach (var item in eInConnection.ToList())
+                            {
+                                var sql = @"SELECT TOP 1 Id AS ParentCompanyId, ParentCompany AS CompanyName, CRM_SERVER AS ServerName, CRM_Database AS DatabaseName, CRM_User AS DatabaseUser, CRM_Password AS DatabasePassword, 'EINClientDb' AS DatabaseCType 
+                                            FROM V_CRMCONNECTIONS WITH(NOLOCK) WHERE Id=@ParentCompanyId;";
 
-                        using var connection = new SqlConnection(connStr);
-                        connection.Open();
-                        var results = connection.Query<(string ParentCompanyId, string ParentCompanyName)>(
-                            query,
+                                var eInsightClientDb = connection.QueryFirstOrDefault<AvailableConnectionInformation>(sql, new { ParentCompanyId = item.ParentCompanyId });
+                                if (eInsightClientDb != null)
+                                    avlConnection.Add(eInsightClientDb);
+                                else
+                                    eInConnection.Remove(item);
+                            }
+
+
+
+                        }
+                        if (db == "CenResDb")
+                        {
+                            var connStr = env.GetValue<string>("ConnectionString");
+                            if (string.IsNullOrEmpty(connStr)) continue;
+                            foreach (var item in eInConnection)
+                            {
+                                using var connection = new SqlConnection(connStr);
+                                var sql = @"SELECT TOP 1 @ParentCompanyName AS CompanyName, @ParentCompanyId AS ParentCompanyId, dd.machName as ServerName ,dd.dbName as DatabaseName, 'CenResDb' AS DatabaseCType 
+                                                    FROM dbo.Locations AS l WITH ( NOLOCK ) 
+                                                    LEFT JOIN dbo.Loc_Inst_Map LIM WITH (NOLOCK) ON l.pk_Locations = LIM.fk_Locations 
+                                                    LEFT JOIN dbo.Installations AS i WITH ( NOLOCK ) ON i.pk_Installations = LIM.fk_Installations 
+                                                    LEFT JOIN DevOpsPortal.dbo.DBCenResByPropertyID AS dd WITH(NOLOCK) ON dd.CendynPropertyID = i.NBB_ID 
+                                                    WHERE l.MgmtCompany=@ParentCompanyName";
+                                var CenResDb = connection.QueryFirstOrDefault<AvailableConnectionInformation>(sql
+                                    , new { ParentCompanyName = item.ParentCompanyName, ParentCompanyId = item.ParentCompanyId });
+
+                                if (CenResDb != null)
+                                    avlConnection.Add(CenResDb);
+                            }
+                        }
+                        if (db == "CenResNormalizeDb")
+                        {
+                            var connStr = env.GetValue<string>("ConnectionString");
+                            var connstrBuilder = new SqlConnectionStringBuilder(connStr);
+                            if (string.IsNullOrEmpty(connStr)) continue;
+                            using var connection = new SqlConnection(connStr);
+                            connection.Open();
+                            var cenResCompany = connection.Query<ConnectionInfo>(
+                            "SELECT ParentCompanyId, ParentCompanyName FROM [CCRM].[ParentCompany] WITH(NOLOCK) WHERE ParentCompanyName LIKE @search",
                             new { search = $"%{searchString}%" }
                         );
-
-                        foreach (var result in results)
-                        {
-                            string parentCompanyId = result.ParentCompanyId;
-                            string parentCompanyName = result.ParentCompanyName;
-
-
-                            if (db == "eInAppDb")
+                            if (cenResCompany != null)
                             {
-                                using var conn = new SqlConnection(connStr);
-                                conn.Open();
-
-                                // Use QueryMultiple to fetch both EINClientDb and CenResDb in one go
-                                var sql = @"SELECT TOP 1 Id AS ParentCompanyId,ParentCompany as Companyname, CRM_SERVER as ServerName, CRM_Database as DatabaseName, CRM_User AS DatabaseUser, CRM_Password AS DatabasePassword, 'EINClientDb' AS DatabaseCType 
-                                        FROM V_CRMCONNECTIONS WITH(NOLOCK) WHERE Id=@ParentCompanyId;
-                                        SELECT TOP 1 Id AS ParentCompanyId, ParentCompany as Companyname, CenRes_Server as ServerName, CenRes_Database as DatabaseName, CenRes_User AS DatabaseUser, CenRes_Password AS DatabasePassword, 'CenResDb' AS DatabaseCType 
-                                        FROM V_CRMCONNECTIONS WITH(NOLOCK) WHERE Id=@ParentCompanyId;";
-
-                                using var multi = conn.QueryMultiple(sql, new { ParentCompanyId = parentCompanyId });
-
-                                var eInsightClientDb = multi.Read<AvailableConnectionInformation>().FirstOrDefault();
-                                if (eInsightClientDb != null)
+                                foreach (var item in cenResCompany)
                                 {
-                                    avlConnection.Add(eInsightClientDb);
+                                    avlConnection.Add(new AvailableConnectionInformation()
+                                    {
+                                        ParentCompanyId = item.ParentCompanyId,
+                                        CompanyName = item.ParentCompanyName,
+                                        ServerName = connstrBuilder.DataSource,
+                                        DatabaseName = connstrBuilder.InitialCatalog,
+                                        DatabaseCType = "CenResNormalizeDb",
+                                        Environment = env.Key,
+                                        ConnectionString = connStr
+                                    });
                                 }
 
-                                var cenResDb = multi.Read<AvailableConnectionInformation>().FirstOrDefault();
-                                if (cenResDb != null)
-                                {
-                                    avlConnection.Add(cenResDb);
-                                }
                             }
-                            if (db == "CenResNormalizeDb")
-                            {
-                                avlConnection.Add(new AvailableConnectionInformation()
-                                {
-                                    ParentCompanyId = parentCompanyId,
-                                    CompanyName = parentCompanyName,
-                                    ServerName = connstrBuilder.DataSource,
-                                    DatabaseName = connstrBuilder.InitialCatalog,
-                                    DatabaseCType = "CenResNormalizeDb",
-                                    Environment = env.Key,
-                                    ConnectionString = connStr
-                                });
-                            }
+
                         }
                     }
                 }
+                HttpContext.Session.Remove("AvlConnection");
+                HttpContext.Session.Remove("LastSearchedCompany");
+                // Update session with new search results
+                HttpContext.Session.SetString("AvlConnection", JsonConvert.SerializeObject(avlConnection));
+                HttpContext.Session.SetString("LastSearchedCompany", searchString ?? string.Empty);
             }
-            GetConfiguredDatabases();
-            TempData["AvlConnection"] = JsonConvert.SerializeObject(avlConnection);
+            else
+            {
+                var avlConnectionJson = HttpContext.Session.GetString("AvlConnection");
+                if (!string.IsNullOrEmpty(avlConnectionJson))
+                    avlConnection = JsonConvert.DeserializeObject<List<AvailableConnectionInformation>>(avlConnectionJson);
+                else
+                    avlConnection = new List<AvailableConnectionInformation>();
+            }
             var viewModel = new UtilityViewModel()
             {
                 SearchString = string.IsNullOrEmpty(searchString) ? string.Empty : searchString,
-                DatabaseInfo = Databases,
+                DatabaseInfo = GetConfiguredDatabases(),
                 ConnectionInformation = avlConnection
             };
             return View(viewModel);
         }
 
-        public void GetConfiguredDatabases()
+        public List<DatabaseInfo> GetConfiguredDatabases()
         {
+            List<DatabaseInfo> Databases = new();
             foreach (var db in dbsList)
             {
                 var section = _config.GetSection(db);
                 foreach (var env in section.GetChildren())
                 {
-                    try
+                    if (db == "MongoDb")
                     {
-                        if (db == "MongoDb")
+                        var mongoDbconnStr = env.GetValue<string>("ConnectionString");
+                        if (!string.IsNullOrEmpty(mongoDbconnStr))
                         {
-                            var mongoDbconnStr = env.GetValue<string>("ConnectionString");
-                            if (!string.IsNullOrEmpty(mongoDbconnStr))
+                            var mongoUrl = new MongoUrl(mongoDbconnStr);
+                            Databases.Add(new DatabaseInfo
                             {
-                                var mongoUrl = new MongoUrl(mongoDbconnStr);
-                                Databases.Add(new DatabaseInfo
-                                {
-                                    DbType = db,
-                                    Environment = env.Key,
-                                    Name = mongoUrl.DatabaseName,
-                                    ServerName = mongoUrl.Server.Host
-                                });
-                            }
-                        }
-                        else
-                        {
-                            var connStr = env.GetValue<string>("ConnectionString");
-                            if (!string.IsNullOrEmpty(connStr))
-                            {
-                                var connstrBuilder = new SqlConnectionStringBuilder(connStr);
-                                Databases.Add(new DatabaseInfo
-                                {
-                                    DbType = db,
-                                    Environment = env.Key,
-                                    Name = connstrBuilder.InitialCatalog,
-                                    ServerName = connstrBuilder.DataSource
-                                });
-                            }
+                                DbType = db,
+                                Environment = env.Key,
+                                Name = mongoUrl.DatabaseName,
+                                ServerName = mongoUrl.Server.Host
+                            });
                         }
                     }
-                    catch
+                    else
                     {
-                        // Optionally log the error or handle as needed
-                        continue;
+                        var connStr = env.GetValue<string>("ConnectionString");
+                        if (!string.IsNullOrEmpty(connStr))
+                        {
+                            var connstrBuilder = new SqlConnectionStringBuilder(connStr);
+                            Databases.Add(new DatabaseInfo
+                            {
+                                DbType = db,
+                                Environment = env.Key,
+                                Name = connstrBuilder.InitialCatalog,
+                                ServerName = connstrBuilder.DataSource
+                            });
+                        }
                     }
                 }
             }
+            return Databases;
         }
 
 
@@ -389,7 +412,7 @@ namespace CendynDataComparisonUtility.Controllers
             return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "DataComparison.xlsx");
         }
 
-        private static List<FieldComparisonRow> CreateProfilesSheet(int featureSet)
+        private List<FieldComparisonRow> CreateProfilesSheet(int featureSet)
         {
             string parentCompanyId = "67371b9bd167a7000161f496";
             var (eInRepo, cenResRepo, mongoRepo, cenResNRepo) = CreateAllRepositories();
@@ -693,7 +716,7 @@ namespace CendynDataComparisonUtility.Controllers
             }
             return comparisonRows;
         }
-        private static List<FieldComparisonRow> CreateReservationsSheet(int featureSet)
+        private List<FieldComparisonRow> CreateReservationsSheet(int featureSet)
         {
             string parentCompanyId = "67371b9bd167a7000161f496";
             var (eInRepo, cenResRepo, mongoRepo, cenResNRepo) = CreateAllRepositories();
@@ -1091,7 +1114,7 @@ namespace CendynDataComparisonUtility.Controllers
 
             return comparisonRows;
         }
-        private static List<FieldComparisonRow> CreateStayDetailsSheet(int featureSet)
+        private List<FieldComparisonRow> CreateStayDetailsSheet(int featureSet)
         {
             string parentCompanyId = "67371b9bd167a7000161f496";
             var (eInRepo, cenResRepo, mongoRepo, cenResNRepo) = CreateAllRepositories();
@@ -1237,7 +1260,7 @@ namespace CendynDataComparisonUtility.Controllers
             }
             return comparisonRows;
         }
-        private static List<FieldComparisonRow> CreateTransactionsSheet(int featureSet)
+        private List<FieldComparisonRow> CreateTransactionsSheet(int featureSet)
         {
             string parentCompanyId = "67371b9bd167a7000161f496";
             var (eInRepo, cenResRepo, mongoRepo, cenResNRepo) = CreateAllRepositories();
@@ -1408,21 +1431,21 @@ namespace CendynDataComparisonUtility.Controllers
         {
             return $"Server={conn.ServerName};Database={conn.DatabaseName};User Id={conn.DatabaseUser};Password={conn.DatabasePassword};TrustServerCertificate=True;";
         }
+        private string FormatCenResDbConnectionString(AvailableConnectionInformation conn)
+        {
+            return $"Server={conn.ServerName};Database={conn.DatabaseName};Integrated Security=True;TrustServerCertificate=True;";
+        }
 
-        private static (EInDbRepository eInRepo, CenResDbRepository cenResRepo, MongoDbRepository mongoRepo, CenResNormalizeDbRepository cenResNRepo)
+
+        private (EInDbRepository eInRepo, CenResDbRepository cenResRepo, MongoDbRepository mongoRepo, CenResNormalizeDbRepository cenResNRepo)
         CreateAllRepositories()
         {
-            string eIn_connectionString = "Server=QDB-D1001.CENTRALSERVICES.LOCAL;Database=eInsightCRM_Origami_QA;Integrated Security=True;TrustServerCertificate=True;";
-            string CenRes_connectionString = "Server=QDB-D1007.CENTRALSERVICES.LOCAL;Database=CenRes_QA_Test;Integrated Security=True;TrustServerCertificate=True;";
-            string cenresNormalizeConnStr = "Server=ddbeus2bi01.CENTRALSERVICES.LOCAL;Database=CCRMBIStaging_Normalized_QA;Integrated Security=True;TrustServerCertificate=True;";
-            string mongoConnStr = "mongodb+srv://int_skumar:asdj3928ASDk2q*2as@stg-mongo-cluster-01.kk0bg.mongodb.net/";
-            string mongoDbName = "push_platform_stg";
-            mongoDbName = mongoDbName.Replace("metadata_", "");
-            string parentCompanyId = "67371b9bd167a7000161f496"; //Cendyn Account Id // Mongo ParentCompanyId 
-            var repo = new EInDbRepository(eIn_connectionString);
-            var cenResRepo = new CenResDbRepository(CenRes_connectionString);
-            var mongoRepo = new MongoDbRepository(mongoConnStr, mongoDbName, parentCompanyId);
-            var cenResNRepo = new CenResNormalizeDbRepository(cenresNormalizeConnStr);
+            //Get Connection Details from Session
+            var (eIn_ConnectionString, cenRes_ConnectionString, mongo_ConnectionString, mongoDbName, mongoParentCompanyId, cenResN_ConnectionString) = GetConnectionFromSession();
+            var repo = new EInDbRepository(eIn_ConnectionString);
+            var cenResRepo = new CenResDbRepository(cenRes_ConnectionString);
+            var mongoRepo = new MongoDbRepository(mongo_ConnectionString, mongoDbName, mongoParentCompanyId);
+            var cenResNRepo = new CenResNormalizeDbRepository(cenResN_ConnectionString);
             return (repo, cenResRepo, mongoRepo, cenResNRepo);
         }
         public class FieldComparisonRow
@@ -1437,6 +1460,27 @@ namespace CendynDataComparisonUtility.Controllers
             public dynamic CenResDbValue { get; set; }
             public dynamic MongoDbValue { get; set; }
             public dynamic CenResNormalizeDbValue { get; set; }
+        }
+
+        private (string eIn_ConnectionString, string cenRes_ConnectionString, string mongo_ConnectionString, string mongoDbName, string mongoParentCompanyId, string cenResN_ConnectionString) GetConnectionFromSession()
+        {
+            var avlConnection = new List<AvailableConnectionInformation>();
+            var avlConnectionJson = HttpContext.Session.GetString("AvlConnection");
+            if (!string.IsNullOrEmpty(avlConnectionJson))
+                avlConnection = JsonConvert.DeserializeObject<List<AvailableConnectionInformation>>(avlConnectionJson);
+
+            var eIn = avlConnection.FirstOrDefault(x => x.DatabaseCType == "EINClientDb");
+            var cenRes = avlConnection.FirstOrDefault(x => x.DatabaseCType == "CenResDb");
+            var mongo = avlConnection.FirstOrDefault(x => x.DatabaseCType == "MongoDb");
+            string mongoDbName = mongo != null && !string.IsNullOrEmpty(mongo.DatabaseName) ? mongo.DatabaseName.Replace("metadata_", "") : null;
+            if (mongo != null) mongo.DatabaseName = mongoDbName;
+            var cenResN = avlConnection.FirstOrDefault(x => x.DatabaseCType == "CenResNormalizeDb");
+
+            string eInConnStr = eIn != null ? FormatConnectionString(eIn) : null;
+            string cenResConnStr = cenRes != null ? FormatCenResDbConnectionString(cenRes) : null;
+            string cenResNConnStr = cenResN != null ? cenResN.ConnectionString : null;
+
+            return (eInConnStr, cenResConnStr, mongo.ConnectionString, mongoDbName, mongo.ParentCompanyId, cenResNConnStr);
         }
     }
 }

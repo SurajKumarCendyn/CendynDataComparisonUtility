@@ -66,18 +66,7 @@
                                 <li> Number of transactions</li>
                             </ul>
                             <form asp-action="VolumeBasedResult" asp-controller="Utility" method="post">
-                                <input type="hidden" name="feature" asp-for="@Model.RecordSelectionModel.Feature" value="1" />
-                                <h4>Select Time Frame</h4>
-                                <div>
-                                    <label>
-                                        <input type="radio" asp-for="@Model.RecordSelectionModel.TimeFrame" name="TimeFrame" value="Last3Years" style="cursor:pointer;" /> Last 3 years of data
-                                    </label>
-                                </div>
-                                <div>
-                                    <label>
-                                        <input type="radio" asp-for="@Model.RecordSelectionModel.TimeFrame" name="TimeFrame" value="AllData" style="cursor:pointer;" /> All data
-                                    </label>
-                                </div>
+                               
                                 <button type="submit" class="btn btn-success">Submit</button>
                             </form>
                         </div>
