@@ -27,14 +27,14 @@
 ,DC.JobTitle
 ,DC.AllowEMail
 ,DC.AllowMail
-,   CAST('080b4184-59c1-f011-9e44-0050568a6622' AS uniqueidentifier) AS PK_Profiles
+,DC.PK_Profiles
 FROM [dbo].[D_Customer] DC WITH(NOLOCK) ";
             public const string Stay = @"SELECT 
-                                         CAST('A0705096-8BCB-F011-9E44-0050568A6622' AS uniqueidentifier) AS Pk_Reservations
+                                         Pk_Reservations
                                         ,SourceStayID
                                         ,CustomerID
                                         ,SourceGuestId
-                                        ,'390231' AS ReservationNumber
+                                        ,ReservationNumber
                                         ,CendynPropertyID
                                         ,SubReservationNumber
                                         ,CentralReservation
@@ -65,11 +65,11 @@ FROM [dbo].[D_Customer] DC WITH(NOLOCK) ";
                                         ,ExternalResID2
                                         FROM D_CUSTOMER_STAY R WITH (NOLOCK)";
             public const string StayDetail = @"SELECT  
-                                             CAST('90C9726C-FC99-47BE-A2F8-8B335E024CDD' AS uniqueidentifier)  AS Pk_StayDetail
+                                             Pk_StayDetail
                                             ,SR.RateId
                                             ,SR.SourceStayId
                                             ,SR.CustomerId
-                                            ,'390231' AS ReservationNumber
+                                            ,ReservationNumber
                                             ,CS.CendynPropertyID
                                             ,SR.StayDate
                                             ,SR.StayRateType

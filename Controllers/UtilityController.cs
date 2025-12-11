@@ -224,26 +224,13 @@ namespace CendynDataComparisonUtility.Controllers
         [HttpGet("Utility/VolumeBasedResult")]
         public FileContentResult VolumeBasedResult()
         {
-            // EInDb counts
-            //string einConnStr = "Server=QDB-D1001.CENTRALSERVICES.LOCAL;Database=eInsightCRM_Origami_QA;Integrated Security=True;TrustServerCertificate=True;";
-            //var einRepo = new EInDbRepository(einConnStr);
-            //var einRows = einRepo.GetEInDbCountRows();
+            var (eInRepo, cenResRepo, mongoRepo, mongoParentCompanyId, cenResNRepo) = CreateAllRepositories();
+
             var einRows = new List<DbCountRow>(); // Temporarily disable EInDb counts
-
-            // CenResDb counts
-            string cenResConnStr = "Server=QDB-D1007.CENTRALSERVICES.LOCAL;Database=CenRes_QA_Test;Integrated Security=True;TrustServerCertificate=True;";
-            var cenResRepo = new CenResDbRepository(cenResConnStr);
-            var cenResRows = cenResRepo.GetCenResDbCountRows("1054");
-            var cendynPropertyIds = cenResRows.Select(r => r.CendynPropertyId).Distinct().ToList();
-
-            // MongoDb counts
-            string mongoConnStr = "mongodb+srv://int_skumar:asdj3928ASDk2q*2as@stg-mongo-cluster-01.kk0bg.mongodb.net/";
-            string mongoDbName = "push_platform_stg";
-            string parentCompanyId = "67371b9bd167a7000161f496";
-
-            var mongoRepo = new MongoDbRepository(mongoConnStr, mongoDbName, parentCompanyId);
+            var cenResRows = cenResRepo.GetCenResDbCountRows();
+            var cendynPropertyIds = cenResRows.Select(r => r.CendynPropertyId).Distinct().ToList();           
+         
             var mongoRows = mongoRepo.GetMongoDbCountRows(cendynPropertyIds);
-
             var mongoPropertyId = mongoRows
                                 .GroupBy(x => x.CendynPropertyId)
                                 .Select(g => new CendynPropertyMongoHotelIdMapping
@@ -252,10 +239,8 @@ namespace CendynDataComparisonUtility.Controllers
                                     MongoPropertyId = g.Select(x => x.MongoHotelId).FirstOrDefault()
                                 })
                                 .ToList();
-            // CenResNormalizeDb counts
-            string normConnStr = "Server=ddbeus2bi01.CENTRALSERVICES.LOCAL;Database=CCRMBIStaging_Normalized_QA;Integrated Security=True;TrustServerCertificate=True;";
-            var normRepo = new CenResNormalizeDbRepository(normConnStr);
-            var normRows = normRepo.GetCenResNormalizeDbCountRows(mongoPropertyId);
+
+            var normRows = cenResNRepo.GetCenResNormalizeDbCountRows(mongoPropertyId);
 
             using var wb = new XLWorkbook();
             var ws = wb.Worksheets.Add("VolumeBasedResult");
@@ -473,8 +458,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyId,
-                    ExternalId1 = cen.ExternalProfileID,
-                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    ExternalId1 = cen?.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen?.ExternalProfileID2,
                     TableName = "Profiles",
                     FieldName = "First Name",
                     EInDbValue = ein?.FirstName,
@@ -485,8 +470,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyId,
-                    ExternalId1 = cen.ExternalProfileID,
-                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    ExternalId1 = cen?.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen?.ExternalProfileID2,
                     TableName = "Profiles",
                     FieldName = "Last Name",
                     EInDbValue = ein?.LastName,
@@ -497,8 +482,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyId,
-                    ExternalId1 = cen.ExternalProfileID,
-                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    ExternalId1 = cen?.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen?.ExternalProfileID2,
                     TableName = "Profiles",
                     FieldName = "Salutation",
                     EInDbValue = ein?.Salutation,
@@ -509,8 +494,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyId,
-                    ExternalId1 = cen.ExternalProfileID,
-                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    ExternalId1 = cen?.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen?.ExternalProfileID2,
                     TableName = "Profiles",
                     FieldName = "Address1",
                     EInDbValue = ein?.Address1,
@@ -521,8 +506,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyId,
-                    ExternalId1 = cen.ExternalProfileID,
-                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    ExternalId1 = cen?.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen?.ExternalProfileID2,
                     TableName = "Profiles",
                     FieldName = "City",
                     EInDbValue = ein?.City,
@@ -533,8 +518,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyId,
-                    ExternalId1 = cen.ExternalProfileID,
-                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    ExternalId1 = cen?.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen?.ExternalProfileID2,
                     TableName = "Profiles",
                     FieldName = "StateProvinceCode",
                     EInDbValue = ein?.StateProvinceCode,
@@ -545,8 +530,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyId,
-                    ExternalId1 = cen.ExternalProfileID,
-                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    ExternalId1 = cen?.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen?.ExternalProfileID2,
                     TableName = "Profiles",
                     FieldName = "ZipCode",
                     EInDbValue = ein?.ZipCode,
@@ -557,8 +542,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyId,
-                    ExternalId1 = cen.ExternalProfileID,
-                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    ExternalId1 = cen?.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen?.ExternalProfileID2,
                     TableName = "Profiles",
                     FieldName = "CountryCode",
                     EInDbValue = ein?.CountryCode,
@@ -569,8 +554,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyId,
-                    ExternalId1 = cen.ExternalProfileID,
-                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    ExternalId1 = cen?.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen?.ExternalProfileID2,
                     TableName = "Profiles",
                     FieldName = "PhoneNumber",
                     EInDbValue = ein?.PhoneNumber,
@@ -581,8 +566,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyId,
-                    ExternalId1 = cen.ExternalProfileID,
-                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    ExternalId1 = cen?.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen?.ExternalProfileID2,
                     TableName = "Profiles",
                     FieldName = "HomePhoneNumber",
                     EInDbValue = ein?.HomePhoneNumber,
@@ -593,8 +578,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyId,
-                    ExternalId1 = cen.ExternalProfileID,
-                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    ExternalId1 = cen?.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen?.ExternalProfileID2,
                     TableName = "Profiles",
                     FieldName = "FaxNumber",
                     EInDbValue = ein?.FaxNumber,
@@ -605,8 +590,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyId,
-                    ExternalId1 = cen.ExternalProfileID,
-                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    ExternalId1 = cen?.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen?.ExternalProfileID2,
                     TableName = "Profiles",
                     FieldName = "Email",
                     EInDbValue = ein?.Email,
@@ -617,8 +602,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyId,
-                    ExternalId1 = cen.ExternalProfileID,
-                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    ExternalId1 = cen?.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen?.ExternalProfileID2,
                     TableName = "Profiles",
                     FieldName = "Languages",
                     EInDbValue = ein?.Languages,
@@ -629,8 +614,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyId,
-                    ExternalId1 = cen.ExternalProfileID,
-                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    ExternalId1 = cen?.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen?.ExternalProfileID2,
                     TableName = "Profiles",
                     FieldName = "Nationality",
                     EInDbValue = ein?.Nationality,
@@ -641,8 +626,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyId,
-                    ExternalId1 = cen.ExternalProfileID,
-                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    ExternalId1 = cen?.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen?.ExternalProfileID2,
                     TableName = "Profiles",
                     FieldName = "CellPhoneNumber",
                     EInDbValue = ein?.CellPhoneNumber,
@@ -653,8 +638,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyId,
-                    ExternalId1 = cen.ExternalProfileID,
-                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    ExternalId1 = cen?.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen?.ExternalProfileID2,
                     TableName = "Profiles",
                     FieldName = "BusinessPhoneNumber",
                     EInDbValue = ein?.BusinessPhoneNumber,
@@ -665,8 +650,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyId,
-                    ExternalId1 = cen.ExternalProfileID,
-                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    ExternalId1 = cen?.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen?.ExternalProfileID2,
                     TableName = "Profiles",
                     FieldName = "CompanyTitle",
                     EInDbValue = ein?.CompanyTitle,
@@ -677,8 +662,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyId,
-                    ExternalId1 = cen.ExternalProfileID,
-                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    ExternalId1 = cen?.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen?.ExternalProfileID2,
                     TableName = "Profiles",
                     FieldName = "JobTitle",
                     EInDbValue = ein?.JobTitle,
@@ -689,8 +674,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyId,
-                    ExternalId1 = cen.ExternalProfileID,
-                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    ExternalId1 = cen?.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen?.ExternalProfileID2,
                     TableName = "Profiles",
                     FieldName = "AllowEMail",
                     EInDbValue = ein?.AllowEMail,
@@ -701,8 +686,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyId,
-                    ExternalId1 = cen.ExternalProfileID,
-                    ExternalId2OrTransactionId = cen.ExternalProfileID2,
+                    ExternalId1 = cen?.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen?.ExternalProfileID2,
                     TableName = "Profiles",
                     FieldName = "AllowMail",
                     EInDbValue = ein?.AllowMail,
@@ -770,8 +755,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyID,
-                    ExternalId1 = cen.ReservationNumber,
-                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    ExternalId1 = cen?.ReservationNumber,
+                    ExternalId2OrTransactionId = cen?.ExternalResID2,
                     StayDateOrTransactionDate = cen?.ArrivalDate,
                     TableName = "Reservations",
                     FieldName = "Sub Reservation Number",
@@ -783,8 +768,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyID,
-                    ExternalId1 = cen.ReservationNumber,
-                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    ExternalId1 = cen?.ReservationNumber,
+                    ExternalId2OrTransactionId = cen?.ExternalResID2,
                     StayDateOrTransactionDate = cen?.ArrivalDate,
                     TableName = "Reservations",
                     FieldName = "CentralReservation",
@@ -796,8 +781,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyID,
-                    ExternalId1 = cen.ReservationNumber,
-                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    ExternalId1 = cen?.ReservationNumber,
+                    ExternalId2OrTransactionId = cen?.ExternalResID2,
                     StayDateOrTransactionDate = cen?.ArrivalDate,
                     TableName = "Reservations",
                     FieldName = "BookingEngConfNum",
@@ -809,8 +794,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyID,
-                    ExternalId1 = cen.ReservationNumber,
-                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    ExternalId1 = cen?.ReservationNumber,
+                    ExternalId2OrTransactionId = cen?.ExternalResID2,
                     StayDateOrTransactionDate = cen?.ArrivalDate,
                     TableName = "Reservations",
                     FieldName = "StayStatus",
@@ -822,8 +807,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyID,
-                    ExternalId1 = cen.ReservationNumber,
-                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    ExternalId1 = cen?.ReservationNumber,
+                    ExternalId2OrTransactionId = cen?.ExternalResID2,
                     StayDateOrTransactionDate = cen?.ArrivalDate,
                     TableName = "Reservations",
                     FieldName = "ArrivalDate",
@@ -835,8 +820,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyID,
-                    ExternalId1 = cen.ReservationNumber,
-                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    ExternalId1 = cen?.ReservationNumber,
+                    ExternalId2OrTransactionId = cen?.ExternalResID2,
                     StayDateOrTransactionDate = cen?.ArrivalDate,
                     TableName = "Reservations",
                     FieldName = "DepartureDate",
@@ -849,8 +834,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyID,
-                    ExternalId1 = cen.ReservationNumber,
-                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    ExternalId1 = cen?.ReservationNumber,
+                    ExternalId2OrTransactionId = cen?.ExternalResID2,
                     StayDateOrTransactionDate = cen?.ArrivalDate,
                     TableName = "Reservations",
                     FieldName = "BookingDate",
@@ -862,8 +847,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyID,
-                    ExternalId1 = cen.ReservationNumber,
-                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    ExternalId1 = cen?.ReservationNumber,
+                    ExternalId2OrTransactionId = cen?.ExternalResID2,
                     StayDateOrTransactionDate = cen?.ArrivalDate,
                     TableName = "Reservations",
                     FieldName = "CancelDate",
@@ -875,8 +860,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyID,
-                    ExternalId1 = cen.ReservationNumber,
-                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    ExternalId1 = cen?.ReservationNumber,
+                    ExternalId2OrTransactionId = cen?.ExternalResID2,
                     StayDateOrTransactionDate = cen?.ArrivalDate,
                     TableName = "Reservations",
                     FieldName = "GroupReservation",
@@ -888,8 +873,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyID,
-                    ExternalId1 = cen.ReservationNumber,
-                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    ExternalId1 = cen?.ReservationNumber,
+                    ExternalId2OrTransactionId = cen?.ExternalResID2,
                     StayDateOrTransactionDate = cen?.ArrivalDate,
                     TableName = "Reservations",
                     FieldName = "Channel",
@@ -901,8 +886,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyID,
-                    ExternalId1 = cen.ReservationNumber,
-                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    ExternalId1 = cen?.ReservationNumber,
+                    ExternalId2OrTransactionId = cen?.ExternalResID2,
                     StayDateOrTransactionDate = cen?.ArrivalDate,
                     TableName = "Reservations",
                     FieldName = "SourceOfBusiness",
@@ -914,8 +899,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyID,
-                    ExternalId1 = cen.ReservationNumber,
-                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    ExternalId1 = cen?.ReservationNumber,
+                    ExternalId2OrTransactionId = cen?.ExternalResID2,
                     StayDateOrTransactionDate = cen?.ArrivalDate,
                     TableName = "Reservations",
                     FieldName = "MarketSeg",
@@ -927,8 +912,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyID,
-                    ExternalId1 = cen.ReservationNumber,
-                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    ExternalId1 = cen?.ReservationNumber,
+                    ExternalId2OrTransactionId = cen?.ExternalResID2,
                     StayDateOrTransactionDate = cen?.ArrivalDate,
                     TableName = "Reservations",
                     FieldName = "MarketSubSeg",
@@ -940,8 +925,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyID,
-                    ExternalId1 = cen.ReservationNumber,
-                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    ExternalId1 = cen?.ReservationNumber,
+                    ExternalId2OrTransactionId = cen?.ExternalResID2,
                     StayDateOrTransactionDate = cen?.ArrivalDate,
                     TableName = "Reservations",
                     FieldName = "RoomNights",
@@ -953,8 +938,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyID,
-                    ExternalId1 = cen.ReservationNumber,
-                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    ExternalId1 = cen?.ReservationNumber,
+                    ExternalId2OrTransactionId = cen?.ExternalResID2,
                     StayDateOrTransactionDate = cen?.ArrivalDate,
                     TableName = "Reservations",
                     FieldName = "NumAdults",
@@ -966,8 +951,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyID,
-                    ExternalId1 = cen.ReservationNumber,
-                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    ExternalId1 = cen?.ReservationNumber,
+                    ExternalId2OrTransactionId = cen?.ExternalResID2,
                     StayDateOrTransactionDate = cen?.ArrivalDate,
                     TableName = "Reservations",
                     FieldName = "NumChildren",
@@ -979,8 +964,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyID,
-                    ExternalId1 = cen.ReservationNumber,
-                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    ExternalId1 = cen?.ReservationNumber,
+                    ExternalId2OrTransactionId = cen?.ExternalResID2,
                     StayDateOrTransactionDate = cen?.ArrivalDate,
                     TableName = "Reservations",
                     FieldName = "TotalPersons",
@@ -992,8 +977,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyID,
-                    ExternalId1 = cen.ReservationNumber,
-                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    ExternalId1 = cen?.ReservationNumber,
+                    ExternalId2OrTransactionId = cen?.ExternalResID2,
                     StayDateOrTransactionDate = cen?.ArrivalDate,
                     TableName = "Reservations",
                     FieldName = "RateType",
@@ -1005,8 +990,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyID,
-                    ExternalId1 = cen.ReservationNumber,
-                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    ExternalId1 = cen?.ReservationNumber,
+                    ExternalId2OrTransactionId = cen?.ExternalResID2,
                     StayDateOrTransactionDate = cen?.ArrivalDate,
                     TableName = "Reservations",
                     FieldName = "RoomTypeCode",
@@ -1018,8 +1003,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyID,
-                    ExternalId1 = cen.ReservationNumber,
-                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    ExternalId1 = cen?.ReservationNumber,
+                    ExternalId2OrTransactionId = cen?.ExternalResID2,
                     StayDateOrTransactionDate = cen?.ArrivalDate,
                     TableName = "Reservations",
                     FieldName = "RoomCode",
@@ -1031,8 +1016,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyID,
-                    ExternalId1 = cen.ReservationNumber,
-                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    ExternalId1 = cen?.ReservationNumber,
+                    ExternalId2OrTransactionId = cen?.ExternalResID2,
                     StayDateOrTransactionDate = cen?.ArrivalDate,
                     TableName = "Reservations",
                     FieldName = "IATA",
@@ -1044,8 +1029,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyID,
-                    ExternalId1 = cen.ReservationNumber,
-                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    ExternalId1 = cen?.ReservationNumber,
+                    ExternalId2OrTransactionId = cen?.ExternalResID2,
                     StayDateOrTransactionDate = cen?.ArrivalDate,
                     TableName = "Reservations",
                     FieldName = "NumRooms",
@@ -1057,8 +1042,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyID,
-                    ExternalId1 = cen.ReservationNumber,
-                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    ExternalId1 = cen?.ReservationNumber,
+                    ExternalId2OrTransactionId = cen?.ExternalResID2,
                     StayDateOrTransactionDate = cen?.ArrivalDate,
                     TableName = "Reservations",
                     FieldName = "RoomRevenue",
@@ -1070,8 +1055,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyID,
-                    ExternalId1 = cen.ReservationNumber,
-                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    ExternalId1 = cen?.ReservationNumber,
+                    ExternalId2OrTransactionId = cen?.ExternalResID2,
                     StayDateOrTransactionDate = cen?.ArrivalDate,
                     TableName = "Reservations",
                     FieldName = "Tax",
@@ -1083,8 +1068,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyID,
-                    ExternalId1 = cen.ReservationNumber,
-                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    ExternalId1 = cen?.ReservationNumber,
+                    ExternalId2OrTransactionId = cen?.ExternalResID2,
                     StayDateOrTransactionDate = cen?.ArrivalDate,
                     TableName = "Reservations",
                     FieldName = "OtherRevenues",
@@ -1096,8 +1081,8 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyID,
-                    ExternalId1 = cen.ReservationNumber,
-                    ExternalId2OrTransactionId = cen.ExternalResID2,
+                    ExternalId1 = cen?.ReservationNumber,
+                    ExternalId2OrTransactionId = cen?.ExternalResID2,
                     StayDateOrTransactionDate = cen?.ArrivalDate,
                     TableName = "Reservations",
                     FieldName = "TotalRevenue",
@@ -1175,7 +1160,7 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyId,
-                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId1 = cen?.ReservationNumber,
                     ExternalId2OrTransactionId = "", //check this field
                     StayDateOrTransactionDate = cen?.StayDate,
                     TableName = "StayDetails",
@@ -1189,7 +1174,7 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyId,
-                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId1 = cen?.ReservationNumber,
                     ExternalId2OrTransactionId = "", //check this field
                     StayDateOrTransactionDate = cen?.StayDate,
                     TableName = "StayDetails",
@@ -1203,7 +1188,7 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyId,
-                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId1 = cen?.ReservationNumber,
                     ExternalId2OrTransactionId = "", //check this field
                     StayDateOrTransactionDate = cen?.StayDate,
                     TableName = "StayDetails",
@@ -1216,7 +1201,7 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyId,
-                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId1 = cen?.ReservationNumber,
                     ExternalId2OrTransactionId = "", //check this field
                     StayDateOrTransactionDate = cen?.StayDate,
                     TableName = "StayDetails",
@@ -1229,7 +1214,7 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyId,
-                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId1 = cen?.ReservationNumber,
                     ExternalId2OrTransactionId = "", //check this field
                     StayDateOrTransactionDate = cen?.StayDate,
                     TableName = "StayDetails",
@@ -1242,7 +1227,7 @@ namespace CendynDataComparisonUtility.Controllers
                 comparisonRows.Add(new FieldComparisonRow
                 {
                     PropertyId = cen?.CendynPropertyId,
-                    ExternalId1 = cen.ReservationNumber,
+                    ExternalId1 = cen?.ReservationNumber,
                     ExternalId2OrTransactionId = "", //check this field
                     StayDateOrTransactionDate = cen?.StayDate,
                     TableName = "StayDetails",

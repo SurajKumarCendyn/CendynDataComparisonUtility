@@ -17,7 +17,7 @@ namespace CendynDataComparisonUtility.Service
             var queryBuilder = new StringBuilder(QueryDefinitions.CenResDb.Profiles);
             if (feature == 1 && pk_profileIds != null && pk_profileIds.Count > 0)
             {
-                queryBuilder.Append(" WHERE P.PK_Profiles IN @Ids"); //({string.Join(",", pk_profileIds.Select(id => $"'{id}'"))})
+                queryBuilder.Append(" WHERE P.PK_Profiles IN @Ids"); 
                 queryBuilder.Append(@" GROUP BY
                         P.PK_Profiles,
                         P.Salutation,
@@ -40,7 +40,6 @@ namespace CendynDataComparisonUtility.Service
             }
             else if (feature == 2)
             {
-                queryBuilder.Append(" WHERE CendynPropertyId='1054'"); //Hardcode for testing
                 queryBuilder.Append(@" GROUP BY
                         P.PK_Profiles,
                         P.Salutation,
@@ -61,7 +60,7 @@ namespace CendynDataComparisonUtility.Service
                         P.AllowEmail,
                         P.JobTitle,
                         P.DateInserted");
-                queryBuilder.Append(" ORDER BY P.DateInserted DESC OFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY");
+                queryBuilder.Append(" ORDER BY P.DateInserted DESC OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY");
             }
 
             using var connection = new SqlConnection(_connectionString);

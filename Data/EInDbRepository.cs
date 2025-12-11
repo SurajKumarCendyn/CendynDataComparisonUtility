@@ -18,8 +18,7 @@ namespace CendynDataComparisonUtility.Data
         /// <returns></returns>
         public IEnumerable<Customer> GetCustomers()
         {
-            var queryBuilder = new StringBuilder(QueryDefinitions.EInDb.Customer);
-            //queryBuilder.Append(" WHERE DC.PK_PROFILES IN ('A942E735-3050-EF11-9E46-0050568A9C71','AA42E735-3050-EF11-9E46-0050568A9C71','E1375616-0E54-EF11-9E46-0050568A9C71','E2375616-0E54-EF11-9E46-0050568A9C71')");
+            var queryBuilder = new StringBuilder(QueryDefinitions.EInDb.Customer); 
             queryBuilder.Append(" ORDER BY DC.InsertDate DESC OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY");
             using var connection = new SqlConnection(_connectionString);
             var result = connection.Query<Customer>(queryBuilder.ToString());
@@ -33,7 +32,6 @@ namespace CendynDataComparisonUtility.Data
         public IEnumerable<CustomerStay> GetReservations()
         {
             var queryBuilder = new StringBuilder(QueryDefinitions.EInDb.Stay);
-            //queryBuilder.Append(" WHERE R.PK_RESERVATIONS IN ('81356166-A660-EF11-9E46-0050568A9C71')");
             queryBuilder.Append(" ORDER BY R.InsertDate DESC OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY");
             using var connection = new SqlConnection(_connectionString);
             var result = connection.Query<CustomerStay>(queryBuilder.ToString());
@@ -47,7 +45,6 @@ namespace CendynDataComparisonUtility.Data
         public IEnumerable<CustomerStayDetail> GetStayDetails()
         {
             var queryBuilder = new StringBuilder(QueryDefinitions.EInDb.StayDetail);
-            //queryBuilder.Append(" WHERE SR.PK_STAYDETAIL IN ('F31C361E-E5B1-4BE2-B608-0256DCF5DAEA')");
             queryBuilder.Append(" ORDER BY SR.InsertDate DESC OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY");
             using var connection = new SqlConnection(_connectionString);
             var result = connection.Query<CustomerStayDetail>(queryBuilder.ToString());
