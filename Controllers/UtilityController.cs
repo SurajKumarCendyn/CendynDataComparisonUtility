@@ -1443,6 +1443,19 @@ namespace CendynDataComparisonUtility.Controllers
 
         private (string eIn_ConnectionString, string cenRes_ConnectionString, string mongo_ConnectionString, string mongoDbName, string mongoParentCompanyId, string cenResN_ConnectionString) GetConnectionFromSession()
         {
+            var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+            if (string.Equals(env, "Development", StringComparison.OrdinalIgnoreCase))
+            {
+                // Replace these with your actual static dev connection strings and values
+                string eIn_ConnectionString = "Server=QDB-D1001.CENTRALSERVICES.LOCAL;Database=eContact_cendyn_QA;Integrated Security=True;TrustServerCertificate=True;";
+                string cenRes_ConnectionString = "Server=QDB-D1007.CENTRALSERVICES.LOCAL;Database=CenRes_QA_Test;Integrated Security=True;TrustServerCertificate=True;";
+                string mongo_ConnectionString = "mongodb+srv://int_skumar:asdj3928ASDk2q*2as@stg-mongo-cluster-01.kk0bg.mongodb.net/";
+                string mongoDb = "push_platform_stg_metadata";
+                string mongoParentCompanyId = "67371b9bd167a7000161f496";
+                string cenResN_ConnectionString = "Server=ddbeus2bi01.CENTRALSERVICES.LOCAL;Database=CCRMBIStaging_Normalized_QA;Integrated Security=True;TrustServerCertificate=True;";
+                return (eIn_ConnectionString, cenRes_ConnectionString, mongo_ConnectionString, mongoDb, mongoParentCompanyId, cenResN_ConnectionString);
+            }
+
             var avlConnection = new List<AvailableConnectionInformation>();
             var avlConnectionJson = HttpContext.Session.GetString("AvlConnection");
             if (!string.IsNullOrEmpty(avlConnectionJson))

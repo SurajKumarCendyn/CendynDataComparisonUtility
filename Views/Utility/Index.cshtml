@@ -1,6 +1,7 @@
 ﻿@model UtilityViewModel
 @{
     ViewData["Title"] = "Index";
+    var env = (IWebHostEnvironment)ViewContext.HttpContext.RequestServices.GetService(typeof(IWebHostEnvironment));
     var dbTypes = Model.DatabaseInfo.GroupBy(db => db.DbType).ToList();
     var availableEnvironment = Model.DatabaseInfo.GroupBy(db => db.Environment).ToList();
 }
@@ -66,13 +67,49 @@
                                 <li> Number of transactions</li>
                             </ul>
                             <form asp-action="VolumeBasedResult" asp-controller="Utility" method="get">
-                               
+
                                 <button type="submit" class="btn btn-success">Submit</button>
                             </form>
                         </div>
                     </div>
 
                 }
+            
+                @if (env != null && env.EnvironmentName == Environments.Development || env.EnvironmentName == Environments.Staging)
+                {
+                    <h5> Environment is: @env.EnvironmentName</h5>
+                    <h6>Only Used for Testing in development phase </h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h4>Field Level Comparison</h4>
+                            <form method="get" asp-controller="Utility" asp-action="CompareData">
+                                <input type="hidden" name="featureSet" value="1" />
+                                <input type="hidden" name="searchString" value="@Model.SearchString" />
+                                <button type="submit" class="btn btn-success">Compare eIn&lt;&gt;CenRes&lt;&gt;Mongo&lt;&gt;Normalize</button>
+                            </form>
+                            <form method="get" asp-controller="Utility" asp-action="CompareData">
+                                <input type="hidden" name="featureSet" value="2" />
+                                <input type="hidden" name="searchString" value="@Model.SearchString" />
+                                <button type="submit" class="btn btn-success">Compare  CenRes&lt;&gt;Mongo&lt;&gt;Normalize</button>
+                            </form>
+                        </div>
+                        <div class="col-md-6">
+
+                            <h4>Volume Based Comparison</h4>
+                            <ul>
+                                <li> Number of profiles</li>
+                                <li> Number of reservations</li>
+                                <li> Number of nightly rate rows</li>
+                                <li> Number of transactions</li>
+                            </ul>
+                            <form asp-action="VolumeBasedResult" asp-controller="Utility" method="get">
+
+                                <button type="submit" class="btn btn-success">Submit</button>
+                            </form>
+                        </div>
+                    </div>
+                }
+
             </div>
         </div>
     </div>
@@ -126,5 +163,4 @@
             </div>
         </div>
     </div>
-
 </div>
