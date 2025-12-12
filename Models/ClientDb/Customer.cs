@@ -23,6 +23,7 @@
         public string JobTitle { get; set; }
         public string AllowEMail { get; set; }
         public string AllowMail { get; set; }
+        public string AllowMarketResearch { get; set; }
         public string PhoneNumber { get; set; }
         public string Email { get; set; }
         public Guid PK_Profiles { get; set; }

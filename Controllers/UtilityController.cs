@@ -6,6 +6,7 @@ using CendynDataComparisonUtility.Models.Dtos;
 using CendynDataComparisonUtility.Service;
 using ClosedXML.Excel;
 using Dapper;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using MongoDB.Driver;
@@ -15,6 +16,7 @@ using static CendynDataComparisonUtility.Service.CenResNormalizeDbRepository;
 
 namespace CendynDataComparisonUtility.Controllers
 {
+    [Authorize]
     public class UtilityController : Controller
     {
         private readonly IConfiguration _config;
@@ -306,6 +308,7 @@ namespace CendynDataComparisonUtility.Controllers
         {
             using var wb = new XLWorkbook();
             var ws = wb.Worksheets.Add("TOP 100 Records");
+
             ws.Cell(1, 1).Value = "PropertyId";
             ws.Cell(1, 2).Value = "ExternalId1";
             ws.Cell(1, 3).Value = "ExternalId2/TransactionId";
@@ -315,7 +318,7 @@ namespace CendynDataComparisonUtility.Controllers
             ws.Cell(1, 7).Value = "eInDb";
             ws.Cell(1, 8).Value = "CenResDb";
             ws.Cell(1, 9).Value = "MongoDb";
-            ws.Cell(1, 10).Value = "CenResNormalizeDb";
+            ws.Cell(1, 10).Value = "CenResNormalizeDb"; 
 
             int rowIndex = 2;
 
@@ -334,8 +337,7 @@ namespace CendynDataComparisonUtility.Controllers
                 ws.Cell(rowIndex, 9).Value = row?.MongoDbValue ?? string.Empty;
                 ws.Cell(rowIndex, 10).Value = row?.CenResNormalizeDbValue ?? string.Empty;
                 rowIndex++;
-            }
-
+            }          
             // Reservations
             var reservationsData = CreateReservationsSheet(featureSet);
             foreach (var row in reservationsData)
@@ -351,8 +353,7 @@ namespace CendynDataComparisonUtility.Controllers
                 ws.Cell(rowIndex, 9).Value = row?.MongoDbValue ?? string.Empty;
                 ws.Cell(rowIndex, 10).Value = row?.CenResNormalizeDbValue ?? string.Empty;
                 rowIndex++;
-            }
-
+            }                       
             // StayDetails
             var stayDetailsData = CreateStayDetailsSheet(featureSet);
             foreach (var row in stayDetailsData)
@@ -368,8 +369,7 @@ namespace CendynDataComparisonUtility.Controllers
                 ws.Cell(rowIndex, 9).Value = row?.MongoDbValue ?? string.Empty;
                 ws.Cell(rowIndex, 10).Value = row.StayDateOrTransactionDate?.ToString("yyyy-MM-dd HH:mm:ss") ?? "";
                 rowIndex++;
-            }
-
+            }           
             // Transactions
             var transactionsData = CreateTransactionsSheet(featureSet);
             foreach (var row in transactionsData)
@@ -386,16 +386,93 @@ namespace CendynDataComparisonUtility.Controllers
                 ws.Cell(rowIndex, 10).Value = row?.CenResNormalizeDbValue ?? string.Empty;
                 rowIndex++;
             }
-
+            
             ws.Columns().AdjustToContents();
             ws.SheetView.FreezeRows(1);
+
+            var ws2 = wb.Worksheets.Add("Random 100 Records");
+            ws2.Cell(1, 1).Value = "PropertyId";
+            ws2.Cell(1, 2).Value = "ExternalId1";
+            ws2.Cell(1, 3).Value = "ExternalId2/TransactionId";
+            ws2.Cell(1, 4).Value = "Stay Date/Transaction Date";
+            ws2.Cell(1, 5).Value = "Table Name";
+            ws2.Cell(1, 6).Value = "Field Name";
+            ws2.Cell(1, 7).Value = "eInDb";
+            ws2.Cell(1, 8).Value = "CenResDb";
+            ws2.Cell(1, 9).Value = "MongoDb";
+            ws2.Cell(1, 10).Value = "CenResNormalizeDb";
+
+            rowIndex = 2; // <-- Reset rowIndex for the second sheet
+            var profilesDataRandom = CreateProfilesSheet(featureSet, top100orRandom: false);
+            foreach (var row in profilesDataRandom)
+            {
+                ws2.Cell(rowIndex, 1).Value = row.PropertyId;
+                ws2.Cell(rowIndex, 2).Value = row.ExternalId1;
+                ws2.Cell(rowIndex, 3).Value = row.ExternalId2OrTransactionId;
+                ws2.Cell(rowIndex, 4).Value = ""; // No Stay Date for Profiles
+                ws2.Cell(rowIndex, 5).Value = row.TableName;
+                ws2.Cell(rowIndex, 6).Value = row.FieldName;
+                ws2.Cell(rowIndex, 7).Value = row?.EInDbValue ?? string.Empty;
+                ws2.Cell(rowIndex, 8).Value = row?.CenResDbValue ?? string.Empty;
+                ws2.Cell(rowIndex, 9).Value = row?.MongoDbValue ?? string.Empty;
+                ws2.Cell(rowIndex, 10).Value = row?.CenResNormalizeDbValue ?? string.Empty;
+                rowIndex++;
+            }
+            var reservationsDataRandom = CreateReservationsSheet(featureSet, top100orRandom: false);
+            foreach (var row in reservationsDataRandom)
+            {
+                ws2.Cell(rowIndex, 1).Value = row.PropertyId;
+                ws2.Cell(rowIndex, 2).Value = row.ExternalId1;
+                ws2.Cell(rowIndex, 3).Value = row.ExternalId2OrTransactionId;
+                ws2.Cell(rowIndex, 4).Value = row.StayDateOrTransactionDate?.ToString() ?? "";
+                ws2.Cell(rowIndex, 5).Value = row.TableName;
+                ws2.Cell(rowIndex, 6).Value = row.FieldName;
+                ws2.Cell(rowIndex, 7).Value = row?.EInDbValue ?? string.Empty;
+                ws2.Cell(rowIndex, 8).Value = row?.CenResDbValue ?? string.Empty;
+                ws2.Cell(rowIndex, 9).Value = row?.MongoDbValue ?? string.Empty;
+                ws2.Cell(rowIndex, 10).Value = row?.CenResNormalizeDbValue ?? string.Empty;
+                rowIndex++;
+            }
+            var stayDetailsDataRandom = CreateStayDetailsSheet(featureSet, top100orRandom: false);
+            foreach (var row in stayDetailsDataRandom)
+            {
+                ws2.Cell(rowIndex, 1).Value = row.PropertyId;
+                ws2.Cell(rowIndex, 2).Value = row.ExternalId1;
+                ws2.Cell(rowIndex, 3).Value = row.ExternalId2OrTransactionId;
+                ws2.Cell(rowIndex, 4).Value = row.StayDateOrTransactionDate?.ToString("yyyy-MM-dd HH:mm:ss") ?? "";
+                ws2.Cell(rowIndex, 5).Value = row.TableName;
+                ws2.Cell(rowIndex, 6).Value = row.FieldName;
+                ws2.Cell(rowIndex, 7).Value = row?.EInDbValue ?? string.Empty;
+                ws2.Cell(rowIndex, 8).Value = row?.CenResDbValue ?? string.Empty;
+                ws2.Cell(rowIndex, 9).Value = row?.MongoDbValue ?? string.Empty;
+                ws2.Cell(rowIndex, 10).Value = row.StayDateOrTransactionDate?.ToString("yyyy-MM-dd HH:mm:ss") ?? "";
+                rowIndex++;
+            }
+            var transactionsDataRandom = CreateTransactionsSheet(featureSet, top100orRandom: false);
+            foreach (var row in transactionsDataRandom)
+            {
+                ws2.Cell(rowIndex, 1).Value = row.PropertyId;
+                ws2.Cell(rowIndex, 2).Value = row.ExternalId1;
+                ws2.Cell(rowIndex, 3).Value = row.ExternalId2OrTransactionId;
+                ws2.Cell(rowIndex, 4).Value = row.StayDateOrTransactionDate?.ToString() ?? "";
+                ws2.Cell(rowIndex, 5).Value = row.TableName;
+                ws2.Cell(rowIndex, 6).Value = row.FieldName;
+                ws2.Cell(rowIndex, 7).Value = row?.EInDbValue ?? string.Empty;
+                ws2.Cell(rowIndex, 8).Value = row?.CenResDbValue ?? string.Empty;
+                ws2.Cell(rowIndex, 9).Value = row?.MongoDbValue ?? string.Empty;
+                ws2.Cell(rowIndex, 10).Value = row?.CenResNormalizeDbValue ?? string.Empty;
+                rowIndex++;
+            }
+            ws2.Columns().AdjustToContents();
+            ws2.SheetView.FreezeRows(1);
+
             using var stream = new MemoryStream();
             wb.SaveAs(stream);
             stream.Position = 0;
             return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "DataComparison.xlsx");
         }
 
-        private List<FieldComparisonRow> CreateProfilesSheet(int featureSet)
+        private List<FieldComparisonRow> CreateProfilesSheet(int featureSet, bool top100orRandom=true)
         { 
             var (eInRepo, cenResRepo, mongoRepo, mongoParentCompanyId, cenResNRepo) = CreateAllRepositories();
 
@@ -407,13 +484,13 @@ namespace CendynDataComparisonUtility.Controllers
             {
                 case 1:
                     // Start from eInsight
-                    eIn_Customer = eInRepo.GetCustomers();
+                    eIn_Customer = eInRepo.GetCustomers(top100orRandom);
                     var profileIds = eIn_Customer.Select(c => c.PK_Profiles).ToList();
                     cenRes_Profiles = cenResRepo.GetProfiles(profileIds, featureSet);
                     break;
                 case 2:
                     // Start from CenRes
-                    cenRes_Profiles = cenResRepo.GetProfiles(null, 2);
+                    cenRes_Profiles = cenResRepo.GetProfiles(null, 2,top100orRandom);
                     break;
                 default:
                     // No valid featureSet, leave both as null
@@ -695,10 +772,22 @@ namespace CendynDataComparisonUtility.Controllers
                     MongoDbValue = mongo?.AllowMail,
                     CenResNormalizeDbValue = norm?.AllowMail
                 });
+                comparisonRows.Add(new FieldComparisonRow
+                {
+                    PropertyId = cen?.CendynPropertyId,
+                    ExternalId1 = cen?.ExternalProfileID,
+                    ExternalId2OrTransactionId = cen?.ExternalProfileID2,
+                    TableName = "Profiles",
+                    FieldName = "AllowMarketResearch",
+                    EInDbValue = ein?.AllowMarketResearch,
+                    CenResDbValue = cen?.AllowMarketResearch,
+                    MongoDbValue = mongo?.AllowMarketResearch,
+                    CenResNormalizeDbValue = "NULL"
+                });
             }
             return comparisonRows;
         }
-        private List<FieldComparisonRow> CreateReservationsSheet(int featureSet)
+        private List<FieldComparisonRow> CreateReservationsSheet(int featureSet ,bool top100orRandom = true)
         { 
             var (eInRepo, cenResRepo, mongoRepo, mongoParentCompanyId, cenResNRepo) = CreateAllRepositories();
 
@@ -709,13 +798,13 @@ namespace CendynDataComparisonUtility.Controllers
             {
                 case 1:
                     // Start from eInsight
-                    eIn_Reservations = eInRepo.GetReservations();
+                    eIn_Reservations = eInRepo.GetReservations(top100orRandom);
                     var reservationIds = eIn_Reservations.Select(r => r.Pk_Reservations).ToList();
                     cenRes_Reservations = cenResRepo.GetReservations(reservationIds, 1);
                     break;
                 case 2:
                     // Start from CenRes
-                    cenRes_Reservations = cenResRepo.GetReservations(null, 2);
+                    cenRes_Reservations = cenResRepo.GetReservations(null, 2, top100orRandom);
                     break;
                 default:
                     // No valid featureSet, leave both as null
@@ -1095,7 +1184,7 @@ namespace CendynDataComparisonUtility.Controllers
 
             return comparisonRows;
         }
-        private List<FieldComparisonRow> CreateStayDetailsSheet(int featureSet)
+        private List<FieldComparisonRow> CreateStayDetailsSheet(int featureSet, bool top100orRandom = true)
         { 
             var (eInRepo, cenResRepo, mongoRepo, mongoParentCompanyId, cenResNRepo) = CreateAllRepositories();
 
@@ -1106,13 +1195,13 @@ namespace CendynDataComparisonUtility.Controllers
             {
                 case 1:
                     // Start from eInsight
-                    eIn_StayDetails = eInRepo.GetStayDetails();
+                    eIn_StayDetails = eInRepo.GetStayDetails(top100orRandom);
                     var stayIds = eIn_StayDetails.Select(s => s.Pk_StayDetail).ToList();
                     cenRes_StayDetails = cenResRepo.GetStayDetails(stayIds);
                     break;
                 case 2:
                     // Start from CenRes
-                    cenRes_StayDetails = cenResRepo.GetStayDetails(null, 2);
+                    cenRes_StayDetails = cenResRepo.GetStayDetails(null, 2, top100orRandom);
                     break;
                 default:
                     // No valid featureSet, leave both as null
@@ -1240,7 +1329,7 @@ namespace CendynDataComparisonUtility.Controllers
             }
             return comparisonRows;
         }
-        private List<FieldComparisonRow> CreateTransactionsSheet(int featureSet)
+        private List<FieldComparisonRow> CreateTransactionsSheet(int featureSet, bool top100orRandom = true)
         {
             var (eInRepo, cenResRepo, mongoRepo, mongoParentCompanyId, cenResNRepo) = CreateAllRepositories();
             #region Transactions Comparison 
@@ -1251,13 +1340,13 @@ namespace CendynDataComparisonUtility.Controllers
             {
                 case 1:
                     // Start from eInsight
-                    eIn_Transaction = eInRepo.GetTransactions();
+                    eIn_Transaction = eInRepo.GetTransactions(top100orRandom);
                     var transactionIds = eIn_Transaction.Select(t => t.PK_Transactions).ToList();
                     cenRes_Transactions = cenResRepo.GetTransactions(transactionIds);
                     break;
                 case 2:
                     // Start from CenRes
-                    cenRes_Transactions = cenResRepo.GetTransactions(null, 2);
+                    cenRes_Transactions = cenResRepo.GetTransactions(null, 2, top100orRandom);
                     break;
                 default:
                     // No valid featureSet, leave both as null
@@ -1447,7 +1536,7 @@ namespace CendynDataComparisonUtility.Controllers
             if (string.Equals(env, "Development", StringComparison.OrdinalIgnoreCase))
             {
                 // Replace these with your actual static dev connection strings and values
-                string eIn_ConnectionString = "Server=QDB-D1001.CENTRALSERVICES.LOCAL;Database=eContact_cendyn_QA;Integrated Security=True;TrustServerCertificate=True;";
+                string eIn_ConnectionString = "Server=QDB-D1001.CENTRALSERVICES.LOCAL;Database=eInsightCRM_Origami_QA;Integrated Security=True;TrustServerCertificate=True;";
                 string cenRes_ConnectionString = "Server=QDB-D1007.CENTRALSERVICES.LOCAL;Database=CenRes_QA_Test;Integrated Security=True;TrustServerCertificate=True;";
                 string mongo_ConnectionString = "mongodb+srv://int_skumar:asdj3928ASDk2q*2as@stg-mongo-cluster-01.kk0bg.mongodb.net/";
                 string mongoDb = "push_platform_stg_metadata";

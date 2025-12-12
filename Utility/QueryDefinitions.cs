@@ -28,7 +28,9 @@
 ,DC.AllowEMail
 ,DC.AllowMail
 ,DC.PK_Profiles
-FROM [dbo].[D_Customer] DC WITH(NOLOCK) ";
+,P.AllowMarketResearch
+FROM [dbo].[D_Customer] DC WITH(NOLOCK) 
+INNER JOIN [dbo].[PMS_Profiles] P WITH(NOLOCK) ON DC.PK_Profiles = P.PK_Profiles";
             public const string Stay = @"SELECT 
                                          Pk_Reservations
                                         ,SourceStayID
@@ -69,7 +71,7 @@ FROM [dbo].[D_Customer] DC WITH(NOLOCK) ";
                                             ,SR.RateId
                                             ,SR.SourceStayId
                                             ,SR.CustomerId
-                                            ,ReservationNumber
+                                            ,SR.ReservationNumber
                                             ,CS.CendynPropertyID
                                             ,SR.StayDate
                                             ,SR.StayRateType
@@ -121,6 +123,7 @@ FROM [dbo].[D_Customer] DC WITH(NOLOCK) ";
                                             ,P.AllowMail
                                             ,P.AllowEmail
                                             ,P.JobTitle
+,P.AllowMarketResearch
                                             FROM [dbo].[Profiles] P WITH(NOLOCK) 
                                             LEFT JOIN [dbo].[ContactMethod] CM WITH(NOLOCK)
                                             ON CM.FK_Profiles = P.PK_Profiles

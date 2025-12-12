@@ -30,5 +30,7 @@
         public string CMType { get; set; }
         public string CMCategory { get; set; }
         public bool IsPrimary { get; set; }
+
+        public bool AllowMarketResearch { get; set; }
     }
 }

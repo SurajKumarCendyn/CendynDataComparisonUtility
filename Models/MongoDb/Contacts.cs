@@ -74,5 +74,8 @@ namespace CendynDataComparisonUtility.Models.MongoDb
 
         [BsonElement("hotel_id")]
         public ObjectId HotelId { get; set; } = default!;
+
+        [BsonElement("allow_market_research")]
+        public bool AllowMarketResearch { get; set; }
     }
 }

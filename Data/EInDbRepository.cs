@@ -16,10 +16,13 @@ namespace CendynDataComparisonUtility.Data
         /// eIn Customers
         /// </summary>
         /// <returns></returns>
-        public IEnumerable<Customer> GetCustomers()
+        public IEnumerable<Customer> GetCustomers(bool top100OrRandom)
         {
             var queryBuilder = new StringBuilder(QueryDefinitions.EInDb.Customer); 
-            queryBuilder.Append(" ORDER BY DC.InsertDate DESC OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY");
+            if (top100OrRandom) 
+                queryBuilder.Append(" ORDER BY DC.InsertDate DESC OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY"); 
+            else 
+                queryBuilder.Append(" ORDER BY NEWID() OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY"); 
             using var connection = new SqlConnection(_connectionString);
             var result = connection.Query<Customer>(queryBuilder.ToString());
             return result.ToList();
@@ -29,10 +32,13 @@ namespace CendynDataComparisonUtility.Data
         /// eIn Reservations
         /// </summary>
         /// <returns></returns>
-        public IEnumerable<CustomerStay> GetReservations()
+        public IEnumerable<CustomerStay> GetReservations(bool top100OrRandom=true)
         {
             var queryBuilder = new StringBuilder(QueryDefinitions.EInDb.Stay);
-            queryBuilder.Append(" ORDER BY R.InsertDate DESC OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY");
+            if (top100OrRandom)
+                queryBuilder.Append(" ORDER BY R.InsertDate DESC OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY");
+            else
+                queryBuilder.Append(" ORDER BY NEWID() OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY");
             using var connection = new SqlConnection(_connectionString);
             var result = connection.Query<CustomerStay>(queryBuilder.ToString());
             return result.ToList();
@@ -42,10 +48,13 @@ namespace CendynDataComparisonUtility.Data
         /// eIn Stay Details
         /// </summary>
         /// <returns></returns>
-        public IEnumerable<CustomerStayDetail> GetStayDetails()
+        public IEnumerable<CustomerStayDetail> GetStayDetails(bool top100OrRandom=true)
         {
             var queryBuilder = new StringBuilder(QueryDefinitions.EInDb.StayDetail);
-            queryBuilder.Append(" ORDER BY SR.InsertDate DESC OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY");
+            if (top100OrRandom)
+                queryBuilder.Append(" ORDER BY SR.InsertDate DESC OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY");
+            else
+                queryBuilder.Append(" ORDER BY NEWID() OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY");
             using var connection = new SqlConnection(_connectionString);
             var result = connection.Query<CustomerStayDetail>(queryBuilder.ToString());
             return result.ToList();
@@ -55,10 +64,13 @@ namespace CendynDataComparisonUtility.Data
         /// Get eIn Transactions
         /// </summary>
         /// <returns></returns>
-        public IEnumerable<CustomerTransactions> GetTransactions()
+        public IEnumerable<CustomerTransactions> GetTransactions(bool top100OrRandom=true)
         {
-            var queryBuilder = new StringBuilder( QueryDefinitions.EInDb.Transactions);
-            queryBuilder.Append(" ORDER BY T.TransactionDate DESC OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY");
+            var queryBuilder = new StringBuilder(QueryDefinitions.EInDb.Transactions);
+            if (top100OrRandom)
+                queryBuilder.Append(" ORDER BY T.TransactionDate DESC OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY");
+            else
+                queryBuilder.Append(" ORDER BY NEWID() OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY");
             using var connection = new SqlConnection(_connectionString);
             var result = connection.Query<CustomerTransactions>(queryBuilder.ToString());
             return result.ToList();
